@@ -26,6 +26,16 @@ func (l *logger) Logf(format string, v ...interface{}) {
 	l.log.Logf(logrus.InfoLevel, format, v...)
 }
 
+func (l *logger) Print(v ...interface{}) {
+
+	l.log.Print(v...)
+}
+
+func (l *logger) Printf(format string, v ...interface{}) {
+
+	l.log.Printf(format, v...)
+}
+
 // WithFields creates a new logger based on logrus.StandardLogger().
 func NewLogger(f *os.File) applogger.Logger {
 
