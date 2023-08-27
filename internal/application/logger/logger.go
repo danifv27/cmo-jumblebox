@@ -17,8 +17,8 @@ type Printer interface {
 	Printf(format string, v ...interface{})
 }
 
-// Info is an interface for Info and Infof.
-type Info interface {
+// Infoer is an interface for Infoer and Infof.
+type Infoer interface {
 	Info(v ...interface{})
 	Infof(format string, v ...interface{})
 }

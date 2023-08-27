@@ -13,26 +13,39 @@ import (
 )
 
 // URI "logger:logrus?level=<logrus_level>ḉ&output=[plain|json]"
-// URI "logger:void"
-func Parse(URI string) (alogger.Logger, error) {
+// URI "printer:void"
+func Parse(URI string) (alogger.Logger, alogger.Printer, alogger.Infoer, error) {
 	var l alogger.Logger
 	var rcerror error
 
 	u, err := url.Parse(URI)
 	if err != nil {
-		return nil, errortree.Add(rcerror, "Parse", err)
+		return nil, nil, nil, errortree.Add(rcerror, "Parse", err)
 	}
-	if u.Scheme != "logger" {
-		return nil, errortree.Add(rcerror, "Parse", fmt.Errorf("invalid scheme %s", URI))
+	if u.Scheme != "logger" || u.Scheme != "printer" || u.Scheme != "infoer" {
+
 	}
-	switch u.Opaque {
-	case "logrus":
-		l = ilogger.NewLogger(os.Stdout)
-	case "void":
-		l = ivoid.NewLogger()
-	default:
-		return nil, errortree.Add(rcerror, "logger.Parse", fmt.Errorf("unsupported logger implementation %q", u.Opaque))
+	switch u.Scheme {
+	case "logger":
+		switch u.Opaque {
+		case "logrus":
+			l = ilogger.NewLogger(os.Stdout)
+		default:
+			return nil, nil, nil, errortree.Add(rcerror, "logger.Parse", fmt.Errorf("unsupported logger implementation %q", u.Opaque))
+		}
+	case "printer":
+		switch u.Opaque {
+		case "void":
+			return nil, ivoid.NewPrinter(), nil, nil
+		default:
+			return nil, nil, nil, errortree.Add(rcerror, "logger.Parse", fmt.Errorf("unsupported printer implementation %q", u.Opaque))
+		}
+	case "infoer":
+		switch u.Opaque {
+		default:
+			return nil, nil, nil, errortree.Add(rcerror, "logger.Parse", fmt.Errorf("unsupported infoer implementation %q", u.Opaque))
+		}
 	}
 
-	return l, nil
+	return nil, nil, nil, errortree.Add(rcerror, "Parse", fmt.Errorf("invalid scheme %s", URI))
 }
