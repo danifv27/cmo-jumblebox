@@ -15,21 +15,17 @@ import (
 // URI "logger:logrus?level=<logrus_level>ḉ&output=[plain|json]"
 // URI "printer:void"
 func Parse(URI string) (alogger.Logger, alogger.Printer, alogger.Infoer, error) {
-	var l alogger.Logger
 	var rcerror error
 
 	u, err := url.Parse(URI)
 	if err != nil {
 		return nil, nil, nil, errortree.Add(rcerror, "Parse", err)
 	}
-	if u.Scheme != "logger" || u.Scheme != "printer" || u.Scheme != "infoer" {
-
-	}
 	switch u.Scheme {
 	case "logger":
 		switch u.Opaque {
 		case "logrus":
-			l = ilogger.NewLogger(os.Stdout)
+			return ilogger.NewLogger(os.Stdout), nil, nil, nil
 		default:
 			return nil, nil, nil, errortree.Add(rcerror, "logger.Parse", fmt.Errorf("unsupported logger implementation %q", u.Opaque))
 		}
