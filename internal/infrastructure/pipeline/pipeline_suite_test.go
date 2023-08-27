@@ -9,5 +9,5 @@ import (
 
 func TestParsePipeline(t *testing.T) {
 	gomega.RegisterFailHandler(ginkgo.Fail)
-	ginkgo.RunSpecs(t, "Parse Pipeline Test Suite")
+	ginkgo.RunSpecs(t, "Pipeline creation")
 }

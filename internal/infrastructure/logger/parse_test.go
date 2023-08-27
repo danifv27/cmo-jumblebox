@@ -23,7 +23,7 @@ var _ = ginkgo.Describe("Parse Logger Implementation", func() {
 			gomega.Expect(lg).NotTo(gomega.BeNil())
 		})
 	})
-	ginkgo.When("We create a new logger", func() {
+	ginkgo.When("We create a new printer", func() {
 		ginkgo.It("Has to be a void based one", func() {
 			var err error
 			var pt alogger.Printer

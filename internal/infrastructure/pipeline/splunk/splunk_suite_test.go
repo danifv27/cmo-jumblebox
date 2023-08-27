@@ -9,5 +9,5 @@ import (
 
 func TestSplunkPipeline(t *testing.T) {
 	gomega.RegisterFailHandler(ginkgo.Fail)
-	ginkgo.RunSpecs(t, "Splunk Pipeline Test Suite")
+	ginkgo.RunSpecs(t, "Splunk Pipeline Implementation")
 }
