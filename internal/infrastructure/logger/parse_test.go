@@ -12,23 +12,25 @@ var _ = ginkgo.Describe("Parse Logger Implementation", func() {
 			var err error
 			var lg alogger.Logger
 
-			_, err = Parse("logger:dummy")
+			_, _, _, err = Parse("logger:dummy")
 			gomega.Expect(err).Should(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).Should(gomega.ContainSubstring("unsupported logger implementation"))
-			_, err = Parse("foo:logrus")
+			_, _, _, err = Parse("foo:logrus")
 			gomega.Expect(err).Should(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).Should(gomega.ContainSubstring("invalid scheme"))
-			lg, err = Parse("logger:logrus")
+			lg, _, _, err = Parse("logger:logrus")
 			gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 			gomega.Expect(lg).NotTo(gomega.BeNil())
 		})
+	})
+	ginkgo.When("We create a new logger", func() {
 		ginkgo.It("Has to be a void based one", func() {
 			var err error
-			var lg alogger.Logger
+			var pt alogger.Printer
 
-			lg, err = Parse("logger:void")
+			_, pt, _, err = Parse("printer:void")
 			gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
-			gomega.Expect(lg).NotTo(gomega.BeNil())
+			gomega.Expect(pt).NotTo(gomega.BeNil())
 		})
 	})
 })
