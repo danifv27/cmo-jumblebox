@@ -12,10 +12,6 @@ type logger struct {
 	log *logrus.Logger
 }
 
-func init() {
-
-}
-
 func (l *logger) Log(v ...interface{}) {
 
 	l.log.Log(logrus.InfoLevel, v...)

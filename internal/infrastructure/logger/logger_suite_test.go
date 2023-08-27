@@ -9,5 +9,5 @@ import (
 
 func TestParseLogger(t *testing.T) {
 	gomega.RegisterFailHandler(ginkgo.Fail)
-	ginkgo.RunSpecs(t, "Parse Logger Test Suite")
+	ginkgo.RunSpecs(t, "Logger creation")
 }
