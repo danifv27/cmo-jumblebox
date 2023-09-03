@@ -4,6 +4,9 @@ import "fmt"
 
 // Parse parts of an nginx log entry
 type ParseCmd struct{}
+type ParseCmd struct {
+	File string `kong:"arg,type=existingfile,required,help='File to parse'"`
+}
 
 func (cmd *ParseCmd) Run(cli *CLI, rcerror *error) error {
 

@@ -45,7 +45,6 @@ func main() {
 	bin := filepath.Base(os.Args[0])
 	//config file has precedence over envars
 	ctx := kong.Parse(&cli,
-		kong.Bind(&rcerror),
 		kong.Name(bin),
 		kong.Description("Log Parser"),
 		kong.UsageOnError(),
