@@ -1,6 +1,8 @@
 package tail
 
 import (
+	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -10,6 +12,7 @@ import (
 	"time"
 
 	aconfigurable "fry.org/qft/jumble/internal/application/configurable"
+	afollower "fry.org/qft/jumble/internal/application/follower"
 	alogger "fry.org/qft/jumble/internal/application/logger"
 )
 
@@ -121,6 +124,11 @@ func newReader(file *os.File, followFilePath string, positionFile PositionFile, 
 		closed:         closed,
 		rotated:        rotated,
 	}
+}
+
+func NewTailFollower(name string, opts ...aconfigurable.ConfigurablerFn) (afollower.Follower, error) {
+
+	return OpenTailReader(name, opts...)
 }
 
 // OpenTailReader opens the named file and returns the follow.Reader
@@ -268,6 +276,51 @@ func (r *Reader) Close() error {
 
 	close(r.closed)
 	return r.fu.close()
+}
+
+func (r *Reader) Lines(ctx context.Context) (chan string, chan error) {
+
+	tick := time.NewTicker(10 * time.Millisecond)
+	defer tick.Stop()
+	to := time.After(10 * time.Second)
+	var buf bytes.Buffer
+
+	ch := make(chan string, 1)
+	errCh := make(chan error, 1)
+
+	maxLen := 32
+	go func() {
+		for {
+			b := make([]byte, maxLen-buf.Len())
+			n, err := r.Read(b)
+			if err != nil && err != io.EOF {
+				fmt.Printf("[DBG]Read failure: %v\n", err)
+				errCh <- err
+				return
+			}
+			if n > 0 {
+				buf.Write(b[:n])
+			}
+
+			if buf.Len() > maxLen {
+				errCh <- fmt.Errorf("unexpected read bytes %d, want %d", n, maxLen)
+				return
+			}
+			if buf.Len() == maxLen {
+				ch <- buf.String()
+			}
+			select {
+			case <-to:
+				errCh <- fmt.Errorf("timeout exceeded. got %s", buf.String())
+				return
+			case <-tick.C:
+				continue
+			}
+		}
+	}()
+
+	return ch, errCh
+
 }
 
 func findSameFile(globPatterns []string, findStat *FileStat, printer alogger.Printer) (*os.File, *FileStat, os.FileInfo, error) {
