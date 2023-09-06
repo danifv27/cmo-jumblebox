@@ -12,7 +12,6 @@ import (
 	"time"
 
 	aconfigurable "fry.org/qft/jumble/internal/application/configurable"
-	afollower "fry.org/qft/jumble/internal/application/follower"
 	alogger "fry.org/qft/jumble/internal/application/logger"
 )
 
@@ -126,10 +125,10 @@ func newReader(file *os.File, followFilePath string, positionFile PositionFile, 
 	}
 }
 
-func NewTailFollower(name string, opts ...aconfigurable.ConfigurablerFn) (afollower.Follower, error) {
+// func NewTailFollower(name string, opts ...aconfigurable.ConfigurablerFn) (afollower.Follower, error) {
 
-	return OpenTailReader(name, opts...)
-}
+// 	return OpenTailReader(name, opts...)
+// }
 
 // OpenTailReader opens the named file and returns the follow.Reader
 func OpenTailReader(name string, opts ...aconfigurable.ConfigurablerFn) (*Reader, error) {
