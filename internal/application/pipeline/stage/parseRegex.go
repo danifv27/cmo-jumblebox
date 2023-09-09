@@ -29,41 +29,43 @@ func NewRegexParse(exp string) *RegexParse {
 	preparedFormat := exp
 	concatenatedRe := regexp.MustCompile(`[A-Za-z0-9_]\$[A-Za-z0-9_]`)
 	for concatenatedRe.MatchString(preparedFormat) {
-		preparedFormat = regexp.MustCompile(`([A-Za-z0-9_])\$([A-Za-z0-9_]+)(\\?([^$\\A-Za-z0-9_]))`).ReplaceAllString(
-			preparedFormat, fmt.Sprintf("${1}${3}%s$$${2}${3}", placeholder),
-		)
+		preparedFormat = regexp.MustCompile(`([A-Za-z0-9_])\$([A-Za-z0-9_]+)(\\?([^$\\A-Za-z0-9_]))`).ReplaceAllString(preparedFormat, fmt.Sprintf("${1}${3}%s$$${2}${3}", placeholder))
+		fmt.Printf("[DBG]preparedFormat: ^%v\n", strings.Trim(preparedFormat, " "))
 	}
 	// Second replace each fileds to regexp grouping
 	quotedFormat := regexp.QuoteMeta(preparedFormat + " ")
-	re := regexp.MustCompile(`\\\$([A-Za-z0-9_]+)(?:\\\$[A-Za-z0-9_])*(\\?([^$\\A-Za-z0-9_]))`).ReplaceAllString(
-		quotedFormat, "(?P<$1>[^$3]*)$2")
+	re := regexp.MustCompile(`\\\$([A-Za-z0-9_]+)(?:\\\$[A-Za-z0-9_])*(\\?([^$\\A-Za-z0-9_]))`).ReplaceAllString(quotedFormat, "(?P<$1>[^$3]*)$2")
 	// Finally remove placeholder
 	re = regexp.MustCompile(fmt.Sprintf(".%s", placeholder)).ReplaceAllString(re, "")
+
+	fmt.Printf("[DBG]regexp: ^%v\n", strings.Trim(re, " "))
 	return &RegexParse{
 		format: exp,
 		regexp: regexp.MustCompile(fmt.Sprintf("^%v", strings.Trim(re, " "))),
 	}
 }
 
-func (p *RegexParse) Parse(input isplunk.SplunkPipeMsg) []isplunk.SplunkPipeMsg {
+func (p *RegexParse) Do(input isplunk.SplunkPipeMsg) []isplunk.SplunkPipeMsg {
 
 	var outMsgs []isplunk.SplunkPipeMsg
 
 	if val, ok := input.Get("entry").(string); ok {
 		re := p.regexp
 		fields := re.FindStringSubmatch(val)
-		// fmt.Printf("[DBG]regexp fields: %v", fields)
-		outMsg := isplunk.NewSplunkMessage("parsed.fields", nil)
-		m := make(map[string]string)
-		for i, name := range re.SubexpNames() {
-			if i == 0 {
-				continue
+		if len(fields) > 0 {
+			// fmt.Printf("[DBG]regexp fields: %v", fields)
+			outMsg := isplunk.NewSplunkMessage("parsed.fields", nil)
+			m := make(map[string]string)
+			for i, name := range re.SubexpNames() {
+				if i == 0 {
+					continue
+				}
+				m[name] = fields[i]
 			}
-			m[name] = fields[i]
-		}
-		outMsg.Add("fields", m)
+			outMsg.Add("fields", m)
 
-		return append(outMsgs, outMsg)
+			return append(outMsgs, outMsg)
+		}
 	}
 
 	return outMsgs
