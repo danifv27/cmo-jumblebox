@@ -29,12 +29,15 @@ func (st *SplunkFlatMapStage[S]) Action(ctx context.Context, in <-chan S, prms .
 	var rcerror, err error
 	var hf func(S) []S
 	var ok bool
-	var outputs, buffersize int
+	var outputs, buffersize, workers int
 
 	if outputs, err = st.cfg.GetInt("outputs"); err != nil {
 		return nil, errortree.Add(rcerror, "SplunkFlatMapStage.Action", err)
 	}
 	if buffersize, err = st.cfg.GetInt("buffersize"); err != nil {
+		return nil, errortree.Add(rcerror, "SplunkFlatMapStage.Action", err)
+	}
+	if workers, err = st.cfg.GetInt("workers"); err != nil {
 		return nil, errortree.Add(rcerror, "SplunkFlatMapStage.Action", err)
 	}
 	outs := makeOutputChannels[S](outputs, buffersize)
@@ -55,7 +58,10 @@ func (st *SplunkFlatMapStage[S]) Action(ctx context.Context, in <-chan S, prms .
 				close(ch)
 			}
 		}()
-		doFlatMap[S](ctx, in, hf, outs[0])
+		// flatmap stage doesn't support pool of workers
+		if workers == 1 {
+			doFlatMap[S](ctx, in, hf, outs[0])
+		}
 	}()
 
 	return outs[0], nil
