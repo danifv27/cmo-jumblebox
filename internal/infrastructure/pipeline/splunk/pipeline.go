@@ -45,6 +45,16 @@ func (p *SplunkPipe[S]) Do(ctx context.Context, in <-chan S) (<-chan S, error) {
 	return outch, nil
 }
 
+func makeOutputChannels[S apipe.Messager](outputs int, buffersize int) []chan S {
+	var result []chan S
+
+	for i := 0; i < outputs; i++ {
+		result = append(result, make(chan S, buffersize))
+	}
+
+	return result
+}
+
 // NewSplunkMessage
 func NewSplunkMessage(topic string, data map[string]interface{}) SplunkPipeMsg {
 
