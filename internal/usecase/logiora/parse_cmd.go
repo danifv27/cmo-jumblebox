@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 
 	apipe "fry.org/qft/jumble/internal/application/pipeline"
 	"fry.org/qft/jumble/internal/application/pipeline/stage"
@@ -37,7 +39,8 @@ func (cmd *ParseCmd) Run(cli *CLI) error {
 		return errortree.Add(rcerror, "parsecmd.Run", err)
 	}
 	follow := iTail.NewFollower(f.Name())
-	ctx, cancel := context.WithCancel(context.Background())
+	// ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	// Pipeline source
 	logEntriesCh, logErrorCh, err := follow.Lines(ctx)
 	if err != nil {
@@ -64,7 +67,7 @@ func (cmd *ParseCmd) Run(cli *CLI) error {
 				fmt.Printf("[DBG]error: %v\n", logError)
 				cancel()
 			case <-ct.Done():
-				fmt.Printf("[DBG]context cancelled\n")
+				// fmt.Printf("[DBG]context cancelled. Stopping source goroutine\n")
 				return
 			}
 		}
@@ -75,19 +78,23 @@ func (cmd *ParseCmd) Run(cli *CLI) error {
 		cancel()
 		return errortree.Add(rcerror, "parsecmd.Run", err)
 	}
+	count := 1
+	var msg isplunk.SplunkPipeMsg
 mainLoop:
-	// Drain pipeline
+	// Drain pipelines
 	for {
 		select {
-		case msg := <-outCh:
-			spew.Dump(msg)
-			// fmt.Printf("[DBG]msg: %+v\n", msg)
+		case msg = <-outCh:
+			//
+			fmt.Printf("[DBG]ip processed: %d\n", count)
+			count++
 		case <-ctx.Done():
-			fmt.Printf("[DBG]context cancelled\n")
+			// fmt.Printf("[DBG]context cancelled. Stopping main loop\n")
 			break mainLoop
 		}
 	}
 
+	spew.Dump(msg)
 	fmt.Printf("[DBG]Goodbye World\n")
 	cancel()
 
