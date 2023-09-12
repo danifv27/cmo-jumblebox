@@ -1,8 +1,11 @@
 package stage
 
 import (
+	"fmt"
+
 	isplunk "fry.org/qft/jumble/internal/infrastructure/pipeline/splunk"
 	"github.com/seancfoley/ipaddress-go/ipaddr"
+	"github.com/speijnik/go-errortree"
 )
 
 // IpSet contains unique ip address
@@ -22,15 +25,19 @@ func NewIpSet(ascending bool, field string) *IpSet {
 	}
 }
 
-func (p *IpSet) insert(key string) {
+func (p *IpSet) insert(key string) error {
+	var rcerror error
 
 	if p.set[key] {
-		return // Already in the map
+		return errortree.Add(rcerror, "IpSet.insert", fmt.Errorf("%s already present", key)) // Already in the map
 	}
 	p.ips = append(p.ips, key)
 	p.set[key] = true
+
+	return nil
 }
 
+// only new ips are propagated down the pipeline
 func (p *IpSet) Do(input isplunk.SplunkPipeMsg) []isplunk.SplunkPipeMsg {
 	var outMsgs []isplunk.SplunkPipeMsg
 
@@ -39,7 +46,9 @@ func (p *IpSet) Do(input isplunk.SplunkPipeMsg) []isplunk.SplunkPipeMsg {
 		if ip, exists := val[p.field]; exists {
 			address := ipaddr.NewIPAddressString(ip)
 			if address.IsIPv4() {
-				p.insert(ip)
+				if err := p.insert(ip); err != nil {
+					return outMsgs
+				}
 				outMsg.Add("ipset", p.set)
 				outMsg.Add("ips", p.ips)
 				return append(outMsgs, outMsg)
