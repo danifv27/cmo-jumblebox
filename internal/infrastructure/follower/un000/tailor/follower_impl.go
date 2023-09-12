@@ -34,9 +34,12 @@ func (r *Reader) Lines(ctx context.Context) (chan string, chan error, error) {
 		return chLines, r.t.Errors(), err
 	}
 	go func() {
+		// count := 0
 		for {
 			select {
 			case entry := <-r.t.Lines():
+				// fmt.Printf("[DBG]Lag %d, read lines: %d\n", r.t.Lag(), count)
+				// count++
 				chLines <- entry.String()
 			case <-ctx.Done():
 				return

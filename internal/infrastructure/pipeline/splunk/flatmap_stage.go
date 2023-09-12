@@ -72,6 +72,7 @@ func doFlatMap[S apipe.Messager](ctx context.Context, in <-chan S, f func(S) []S
 	for {
 		select {
 		case <-ctx.Done():
+			// fmt.Println("[DBG]Context done. Terminating FlatmapStage")
 			return
 		case s, ok := <-in:
 			if !ok {
@@ -86,6 +87,7 @@ func doFlatMap[S apipe.Messager](ctx context.Context, in <-chan S, f func(S) []S
 // It blocks until the channel is closed or the provided context is cancelled.
 func sendAll[S any](ctx context.Context, ts []S, ch chan<- S) {
 
+	// fmt.Printf("[DBG]sendAll len: %d\n", len(ts))
 	for _, t := range ts {
 		select {
 		case <-ctx.Done():

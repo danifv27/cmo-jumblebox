@@ -30,7 +30,7 @@ func NewRegexParse(exp string) *RegexParse {
 	concatenatedRe := regexp.MustCompile(`[A-Za-z0-9_]\$[A-Za-z0-9_]`)
 	for concatenatedRe.MatchString(preparedFormat) {
 		preparedFormat = regexp.MustCompile(`([A-Za-z0-9_])\$([A-Za-z0-9_]+)(\\?([^$\\A-Za-z0-9_]))`).ReplaceAllString(preparedFormat, fmt.Sprintf("${1}${3}%s$$${2}${3}", placeholder))
-		fmt.Printf("[DBG]preparedFormat: ^%v\n", strings.Trim(preparedFormat, " "))
+		// fmt.Printf("[DBG]preparedFormat: ^%v\n", strings.Trim(preparedFormat, " "))
 	}
 	// Second replace each fileds to regexp grouping
 	quotedFormat := regexp.QuoteMeta(preparedFormat + " ")
@@ -38,7 +38,7 @@ func NewRegexParse(exp string) *RegexParse {
 	// Finally remove placeholder
 	re = regexp.MustCompile(fmt.Sprintf(".%s", placeholder)).ReplaceAllString(re, "")
 
-	fmt.Printf("[DBG]regexp: ^%v\n", strings.Trim(re, " "))
+	// fmt.Printf("[DBG]regexp: ^%v\n", strings.Trim(re, " "))
 	return &RegexParse{
 		format: exp,
 		regexp: regexp.MustCompile(fmt.Sprintf("^%v", strings.Trim(re, " "))),
