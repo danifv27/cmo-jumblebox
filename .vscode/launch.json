@@ -1,7 +1,7 @@
 {
     "configurations": [
         {
-            "name": "logiora",
+            "name": "tail",
             "type": "go",
             "request": "launch",
             "mode": "debug",
@@ -12,6 +12,22 @@
             "args": [
                 "tail",
                 "../../logs/short_access.log"
+            ],
+            "showLog": true
+        },{
+            "name": "parse",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}/cmd/logiora",
+            "env": {
+                "SC_LOGIORA_PARSE_CMD": "parse ~/Proyectos/packagesGit/casamau/cmo-jumbleBox/logs/access.log"
+            },
+            "args": [
+                "parse",
+                "../../logs/short_access.log",
+                "match",
+                "../../logs/whitelist.txt",
             ],
             "showLog": true
         }

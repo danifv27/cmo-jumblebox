@@ -98,7 +98,7 @@ mainLoop:
 	}
 
 	spew.Dump(msg)
-	fmt.Printf("[DBG]Goodbye World\n")
+	// fmt.Printf("[DBG]Goodbye World\n")
 	cancel()
 
 	return nil

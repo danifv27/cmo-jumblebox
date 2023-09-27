@@ -54,6 +54,7 @@ func main() {
 		// kong.TypeMapper(reflect.TypeOf([]common.K8sResource{}), common.K8sResource{}),
 		kong.Configuration(kong.JSON, configs...),
 	)
+
 	//Run should create the job flow that will be executed as a sequence
 	if err = ctx.Run(&cli); err != nil {
 		rcerror = errortree.Add(rcerror, "context", err)
