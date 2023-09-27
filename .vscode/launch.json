@@ -10,8 +10,8 @@
                 "SC_LOGIORA_PARSE_CMD": "parse ~/Proyectos/packagesGit/casamau/cmo-jumbleBox/logs/access.log"
             },
             "args": [
-                "parse",
-                "/home/dfraile/Proyectos/packagesGit/casamau/cmo-jumbleBox/logs/access.log"
+                "tail",
+                "../../logs/short_access.log"
             ],
             "showLog": true
         }
