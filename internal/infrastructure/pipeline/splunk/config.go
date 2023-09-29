@@ -38,14 +38,11 @@ func (config *splunkConfig) Configure(configs ...aconfigurable.ConfigurablerFn) 
 			return errortree.Add(rcerror, "Configure", err)
 		}
 	}
+	// spew.Dump(config)
 
 	return nil
 }
 
-// WithDone configures a pipeline stage to cancel the returned context when all goroutines started by the stage
-// have been stopped.
-// This is appropriate for termination detection for ANY stages in a pipeline.
-// To await termination of ALL stages in a pipeline, use WithWaitGroup.
 func WithName(name string) aconfigurable.ConfigurablerFn {
 
 	return func(cfg interface{}) error {
@@ -57,6 +54,20 @@ func WithName(name string) aconfigurable.ConfigurablerFn {
 		}
 
 		return errortree.Add(rcerror, "WithName", errors.New("type mismatch, *splunkConfig expected"))
+	}
+}
+
+func WithBufferSize(size int) aconfigurable.ConfigurablerFn {
+
+	return func(cfg interface{}) error {
+		var rcerror error
+
+		if c, ok := cfg.(*splunkConfig); ok {
+			c.buffersize = size
+			return nil
+		}
+
+		return errortree.Add(rcerror, "WithBufferSize", errors.New("type mismatch, *splunkConfig expected"))
 	}
 }
 
