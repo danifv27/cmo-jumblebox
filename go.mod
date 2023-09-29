@@ -7,7 +7,6 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/onsi/ginkgo/v2 v2.11.0
 	github.com/onsi/gomega v1.27.10
-	github.com/seancfoley/ipaddress-go v1.5.4
 	github.com/sirupsen/logrus v1.9.3
 	github.com/speijnik/go-errortree v1.0.1
 	github.com/un000/tailor v0.3.0
@@ -19,7 +18,6 @@ require (
 	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/pprof v0.0.0-20210407192527-94a9f03dee38 // indirect
 	github.com/pkg/errors v0.8.1 // indirect
-	github.com/seancfoley/bintree v1.2.1 // indirect
 	golang.org/x/net v0.12.0 // indirect
 	golang.org/x/sys v0.10.0 // indirect
 	golang.org/x/text v0.11.0 // indirect

@@ -2,9 +2,9 @@ package stage
 
 import (
 	"fmt"
+	"net"
 
 	isplunk "fry.org/qft/jumble/internal/infrastructure/pipeline/splunk"
-	"github.com/seancfoley/ipaddress-go/ipaddr"
 	"github.com/speijnik/go-errortree"
 )
 
@@ -44,8 +44,7 @@ func (p *IpSet) Do(input isplunk.SplunkPipeMsg) []isplunk.SplunkPipeMsg {
 	if val, ok := input.Get("fields").(map[string]string); ok {
 		outMsg := isplunk.NewSplunkMessage("unique.ips", nil)
 		if ip, exists := val[p.field]; exists {
-			address := ipaddr.NewIPAddressString(ip)
-			if address.IsIPv4() {
+			if net.ParseIP(ip) != nil {
 				if err := p.insert(ip); err != nil {
 					return outMsgs
 				}
