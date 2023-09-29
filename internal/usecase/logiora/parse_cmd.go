@@ -17,7 +17,8 @@ import (
 )
 
 type ParseCmd struct {
-	Format string `kong:"help='Log format',default='$remote_addr - $remote_user [$time_local] \"$request\" $status $body_bytes_sent \"$http_referer\" \"$http_user_agent\" rt=$request_time uct=\"$upstream_connect_time\" uht=\"$upstream_header_time\" urt=\"$upstream_response_time\" x_request-id=\"$http_x_request_id\" reqid=\"$reqid\"'"`
+	// Format string `kong:"help='Log format',default='$remote_addr - $remote_user [$time_local] \"$request\" $status $body_bytes_sent \"$http_referer\" \"$http_user_agent\" rt=$request_time uct=\"$upstream_connect_time\" uht=\"$upstream_header_time\" urt=\"$upstream_response_time\" x_request-id=\"$http_x_request_id\" reqid=\"$reqid\"'"`
+	Format string `kong:"help='Log format',default='$http_x_original_forwarded_for - $remote_addr - $remote_user [$time_local] - $request $status'"`
 	File   struct {
 		File  string   `kong:"arg,help='File to parse'"`
 		Match MatchCmd `kong:"cmd,help='Check if ip is whitelisted'"`
@@ -49,8 +50,8 @@ func do(ctx context.Context, cancel context.CancelFunc, pipe apipe.Piper[isplunk
 				expected := isplunk.NewSplunkMessage("input.entry", nil)
 				expected.Add("entry", entry)
 				inCh <- expected
-			case failure, sentBeforeClosed := <-errs:
-				if !sentBeforeClosed || failure != nil {
+			case failure, hasMore := <-errs:
+				if !hasMore || failure != nil {
 					// fmt.Println("[DBG]No more errors")
 					return
 				}
@@ -86,11 +87,11 @@ func (cmd *MatchCmd) Run(cli *CLI) error {
 	}
 	// Pipeline stages
 	// Regexp parse
-	regexParserStg := stage.NewRegexParse(cli.Tail.Format)
+	regexParserStg := stage.NewRegexParse(cli.Parse.Format)
 	st := isplunk.NewSplunkFlatMapStage[isplunk.SplunkPipeMsg](regexParserStg.Do, isplunk.WithName("regexParser"), isplunk.WithBufferSize(3))
 	ppln.Next(st)
 	// Check unique ip
-	ipStg := stage.NewIpSet(true, "remote_addr")
+	ipStg := stage.NewIpSet(true, "http_x_original_forwarded_for")
 	ipset := isplunk.NewSplunkFlatMapStage[isplunk.SplunkPipeMsg](ipStg.Do, isplunk.WithName("ipSet"))
 	ppln.Next(ipset)
 
