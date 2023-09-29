@@ -61,26 +61,30 @@ func (st *SplunkFlatMapStage[S]) Action(ctx context.Context, in <-chan S, prms .
 		}()
 		// flatmap stage doesn't support pool of workers
 		if workers == 1 {
-			doFlatMap[S](ctx, in, hf, outs[0])
+			if err := doFlatMap[S](ctx, in, hf, outs[0]); err != nil {
+				n, _ := st.cfg.GetString("name")
+				fmt.Printf("[DBG]Closing staging %s", n)
+				return
+			}
 		}
+
 	}()
 
 	return outs[0], nil
 }
 
-//TODO: pass name to function
-
-func doFlatMap[S apipe.Messager](ctx context.Context, in <-chan S, f func(S) []S, out chan<- S) {
+func doFlatMap[S apipe.Messager](ctx context.Context, in <-chan S, f func(S) []S, out chan<- S) error {
+	var rcerror error
 
 	for {
 		select {
 		case <-ctx.Done():
 			// fmt.Println("[DBG]Context done. Terminating FlatmapStage")
-			return
+			return nil
 		case s, more := <-in:
 			if !more { //
-				fmt.Println("[DBG]doFlatMap input channel closed")
-				return
+				// fmt.Println("[DBG]doFlatMap input channel closed")
+				return errortree.Add(rcerror, "doFlatMap", errors.New("input channel close"))
 			}
 			sendAll(ctx, f(s), out)
 		}
