@@ -74,3 +74,14 @@ func (config *splunkConfig) GetInt(key string) (int, error) {
 
 	return 0, errortree.Add(rcerror, "GetInt", fmt.Errorf("key %s not found", key))
 }
+
+func (config *splunkConfig) GetString(key string) (string, error) {
+	var rcerror error
+
+	switch key {
+	case "name":
+		return config.name, nil
+	}
+
+	return "", errortree.Add(rcerror, "GetInt", fmt.Errorf("key %s not found", key))
+}
