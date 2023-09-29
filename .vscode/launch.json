@@ -21,7 +21,7 @@
             "mode": "debug",
             "program": "${workspaceFolder}/cmd/logiora",
             "env": {
-                "SC_LOGIORA_PARSE_CMD": "parse ~/Proyectos/packagesGit/casamau/cmo-jumbleBox/logs/access.log"
+                "SC_LOGIORA_PARSE_CMD": "parse ../../logs/short_access.log match ../../logs/whitelist.log"
             },
             "args": [
                 "parse",
