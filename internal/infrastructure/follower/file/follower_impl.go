@@ -77,9 +77,8 @@ func (r *Reader) Lines(ctx context.Context) (chan string, chan error, error) {
 					}
 					return
 				} else {
-					fmt.Print("[DBG]Line readed")
 					r.lines <- line
-					fmt.Println(" -> processed")
+					fmt.Printf("[DBG]Line sended\n")
 				}
 			}
 		}

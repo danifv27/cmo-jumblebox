@@ -48,7 +48,6 @@ func NewRegexParse(exp string) *RegexParse {
 func (p *RegexParse) Do(input isplunk.SplunkPipeMsg) []isplunk.SplunkPipeMsg {
 	var outMsgs []isplunk.SplunkPipeMsg
 
-	fmt.Println(("[DBG]RegexParse processed"))
 	if val, ok := input.Get("entry").(string); ok {
 		re := p.regexp
 		fields := re.FindStringSubmatch(val)
