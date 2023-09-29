@@ -18,6 +18,20 @@ type SplunkPipeMsg struct {
 	data map[string]interface{}
 }
 
+// DeepCopy generates a deep copy of SplunkPipeMsg
+func (o SplunkPipeMsg) DeepCopy() SplunkPipeMsg {
+	var cp SplunkPipeMsg = o
+
+	if o.data != nil {
+		cp.data = make(map[string]interface{}, len(o.data))
+		for k2, v2 := range o.data {
+			cp.data[k2] = v2
+		}
+	}
+
+	return cp
+}
+
 func NewSplunkPipe[S apipe.Messager]() apipe.Piper[S] {
 
 	return &SplunkPipe[S]{}
