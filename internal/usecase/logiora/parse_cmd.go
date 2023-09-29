@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	apipe "fry.org/qft/jumble/internal/application/pipeline"
 	"fry.org/qft/jumble/internal/application/pipeline/stage"
@@ -37,26 +38,27 @@ func do(ctx context.Context, cancel context.CancelFunc, pipe apipe.Piper[isplunk
 	quit := make(chan struct{})
 	inCh := make(chan isplunk.SplunkPipeMsg)
 	go func(ct context.Context) {
+		defer func() {
+			close(inCh)
+			close(quit)
+		}()
 		for {
 			select {
 			case entry, hasMore := <-entries:
 				if !hasMore {
 					// fmt.Println("[DBG]No more entries")
-					close(quit)
 					return
 				}
 				expected := isplunk.NewSplunkMessage("input.entry", nil)
 				expected.Add("entry", entry)
 				inCh <- expected
-			case failure, hasMore := <-errs:
-				if !hasMore || failure != nil {
+			case failure, sentBeforeClosed := <-errs:
+				if !sentBeforeClosed || failure != nil {
 					// fmt.Println("[DBG]No more errors")
-					close(quit)
 					return
 				}
 			case <-ctx.Done():
 				fmt.Printf("[DBG]context cancelled. Stopping source goroutine\n")
-				close(quit)
 				return
 			}
 		}
@@ -86,14 +88,14 @@ func (cmd *MatchCmd) Run(cli *CLI) error {
 		return errortree.Add(rcerror, "matchcmd.do", err)
 	}
 	// Pipeline stages
-	// Regexp parse
+	// // Regexp parse
 	regexParserStg := stage.NewRegexParse(cli.Tail.Format)
-	st := isplunk.NewSplunkFlatMapStage[isplunk.SplunkPipeMsg](regexParserStg.Do)
+	st := isplunk.NewSplunkFlatMapStage[isplunk.SplunkPipeMsg](regexParserStg.Do, isplunk.WithName("regexParser"))
 	ppln.Next(st)
-	// Check unique ip
-	ipStg := stage.NewIpSet(true, "remote_addr")
-	ipset := isplunk.NewSplunkFlatMapStage[isplunk.SplunkPipeMsg](ipStg.Do)
-	ppln.Next(ipset)
+	// // Check unique ip
+	// ipStg := stage.NewIpSet(true, "remote_addr")
+	// ipset := isplunk.NewSplunkFlatMapStage[isplunk.SplunkPipeMsg](ipStg.Do, isplunk.WithName("ipSet"))
+	// ppln.Next(ipset)
 
 	// Pipeline source
 	entriesCh, errorsCh, err := follow.Lines(ctx)
@@ -117,13 +119,13 @@ mainLoop:
 			count++
 		case <-ctx.Done():
 			// fmt.Printf("[DBG]context cancelled. Stopping main loop\n")
-			cancel()
 			break mainLoop
 		case <-quit:
-			cancel()
+			time.Sleep(1 * time.Second)
 			break mainLoop
 		}
 	}
+
 	spew.Dump(msg)
 	fmt.Println("[DBG] Goodbye parse <file> match <whitelist>")
 	cancel()

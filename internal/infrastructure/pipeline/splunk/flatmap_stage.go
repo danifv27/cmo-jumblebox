@@ -3,6 +3,7 @@ package splunk
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/speijnik/go-errortree"
 
@@ -67,6 +68,8 @@ func (st *SplunkFlatMapStage[S]) Action(ctx context.Context, in <-chan S, prms .
 	return outs[0], nil
 }
 
+//TODO: pass name to function
+
 func doFlatMap[S apipe.Messager](ctx context.Context, in <-chan S, f func(S) []S, out chan<- S) {
 
 	for {
@@ -74,8 +77,9 @@ func doFlatMap[S apipe.Messager](ctx context.Context, in <-chan S, f func(S) []S
 		case <-ctx.Done():
 			// fmt.Println("[DBG]Context done. Terminating FlatmapStage")
 			return
-		case s, ok := <-in:
-			if !ok {
+		case s, more := <-in:
+			if !more { //
+				fmt.Println("[DBG]doFlatMap input channel closed")
 				return
 			}
 			sendAll(ctx, f(s), out)

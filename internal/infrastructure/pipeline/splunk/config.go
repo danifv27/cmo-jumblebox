@@ -1,6 +1,7 @@
 package splunk
 
 import (
+	"errors"
 	"fmt"
 
 	aconfigurable "fry.org/qft/jumble/internal/application/configurable"
@@ -9,6 +10,7 @@ import (
 )
 
 type splunkConfig struct {
+	name       string
 	buffersize int
 	outputs    int
 	workers    int
@@ -38,6 +40,24 @@ func (config *splunkConfig) Configure(configs ...aconfigurable.ConfigurablerFn) 
 	}
 
 	return nil
+}
+
+// WithDone configures a pipeline stage to cancel the returned context when all goroutines started by the stage
+// have been stopped.
+// This is appropriate for termination detection for ANY stages in a pipeline.
+// To await termination of ALL stages in a pipeline, use WithWaitGroup.
+func WithName(name string) aconfigurable.ConfigurablerFn {
+
+	return func(cfg interface{}) error {
+		var rcerror error
+
+		if c, ok := cfg.(*splunkConfig); ok {
+			c.name = name
+			return nil
+		}
+
+		return errortree.Add(rcerror, "WithName", errors.New("type mismatch, *splunkConfig expected"))
+	}
 }
 
 func (config *splunkConfig) GetInt(key string) (int, error) {
