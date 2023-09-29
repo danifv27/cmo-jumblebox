@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	apipe "fry.org/qft/jumble/internal/application/pipeline"
 	"fry.org/qft/jumble/internal/application/pipeline/stage"
@@ -31,16 +30,14 @@ type MatchCmd struct {
 	} `kong:"arg"`
 }
 
-func do(ctx context.Context, cancel context.CancelFunc, pipe apipe.Piper[isplunk.SplunkPipeMsg], entries chan string, errs chan error) (<-chan isplunk.SplunkPipeMsg, chan struct{}, error) {
+func do(ctx context.Context, cancel context.CancelFunc, pipe apipe.Piper[isplunk.SplunkPipeMsg], entries chan string, errs chan error) (<-chan isplunk.SplunkPipeMsg, error) {
 	var rcerror, err error
 	var outCh <-chan isplunk.SplunkPipeMsg
 
-	quit := make(chan struct{})
 	inCh := make(chan isplunk.SplunkPipeMsg)
 	go func(ct context.Context) {
 		defer func() {
 			close(inCh)
-			close(quit)
 		}()
 		for {
 			select {
@@ -66,19 +63,19 @@ func do(ctx context.Context, cancel context.CancelFunc, pipe apipe.Piper[isplunk
 
 	// Run the pipeline
 	if outCh, err = pipe.Do(ctx, inCh); err != nil {
+		fmt.Printf("[DBG]pipe.Do err: %s\n", err)
 		cancel()
-		return outCh, quit, errortree.Add(rcerror, "matchcmd.do", err)
+		return outCh, errortree.Add(rcerror, "matchcmd.do", err)
 	}
 
-	return outCh, quit, nil
+	return outCh, nil
 }
 
 func (cmd *MatchCmd) Run(cli *CLI) error {
 	var rcerror, err error
 	var ppln apipe.Piper[isplunk.SplunkPipeMsg]
-	var quit chan struct{}
-	var msg isplunk.SplunkPipeMsg
 	var outCh <-chan isplunk.SplunkPipeMsg
+	var lastMsg interface{}
 
 	//The source of the pipeline are the lines from the log file
 	follow := ifollower.NewFollower(cli.Parse.File.File)
@@ -88,14 +85,14 @@ func (cmd *MatchCmd) Run(cli *CLI) error {
 		return errortree.Add(rcerror, "matchcmd.do", err)
 	}
 	// Pipeline stages
-	// // Regexp parse
+	// Regexp parse
 	regexParserStg := stage.NewRegexParse(cli.Tail.Format)
-	st := isplunk.NewSplunkFlatMapStage[isplunk.SplunkPipeMsg](regexParserStg.Do, isplunk.WithName("regexParser"))
+	st := isplunk.NewSplunkFlatMapStage[isplunk.SplunkPipeMsg](regexParserStg.Do, isplunk.WithName("regexParser"), isplunk.WithBufferSize(3))
 	ppln.Next(st)
-	// // Check unique ip
-	// ipStg := stage.NewIpSet(true, "remote_addr")
-	// ipset := isplunk.NewSplunkFlatMapStage[isplunk.SplunkPipeMsg](ipStg.Do, isplunk.WithName("ipSet"))
-	// ppln.Next(ipset)
+	// Check unique ip
+	ipStg := stage.NewIpSet(true, "remote_addr")
+	ipset := isplunk.NewSplunkFlatMapStage[isplunk.SplunkPipeMsg](ipStg.Do, isplunk.WithName("ipSet"))
+	ppln.Next(ipset)
 
 	// Pipeline source
 	entriesCh, errorsCh, err := follow.Lines(ctx)
@@ -104,29 +101,31 @@ func (cmd *MatchCmd) Run(cli *CLI) error {
 		return errortree.Add(rcerror, "matchcmd.Run", err)
 	}
 
-	if outCh, quit, err = do(ctx, cancel, ppln, entriesCh, errorsCh); err != nil {
+	if outCh, err = do(ctx, cancel, ppln, entriesCh, errorsCh); err != nil {
 		cancel()
 		return errortree.Add(rcerror, "matchcmd.Run", err)
 	}
 
 	// Drain pipeline
-	count := 1
+	count := 0
 mainLoop:
 	for {
 		select {
-		case msg = <-outCh:
-			fmt.Printf("[DBG]entry processed: %d\n", count)
+		case msg, more := <-outCh:
+			if !more {
+				fmt.Printf("[DBG]Run: No more items. Stopping main loop\n")
+				break mainLoop
+			}
+			lastMsg = msg.DeepCopy()
 			count++
 		case <-ctx.Done():
-			// fmt.Printf("[DBG]context cancelled. Stopping main loop\n")
-			break mainLoop
-		case <-quit:
-			time.Sleep(1 * time.Second)
+			fmt.Printf("[DBG]Run: context cancelled. Stopping main loop\n")
 			break mainLoop
 		}
+		// fmt.Printf("[DBG] len(outCh)=%d\n", len(outCh))
 	}
-
-	spew.Dump(msg)
+	fmt.Printf("[DBG]Total entry processed: %d\n", count)
+	spew.Dump(lastMsg)
 	fmt.Println("[DBG] Goodbye parse <file> match <whitelist>")
 	cancel()
 
