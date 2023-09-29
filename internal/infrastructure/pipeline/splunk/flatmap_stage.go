@@ -11,6 +11,16 @@ import (
 	apipe "fry.org/qft/jumble/internal/application/pipeline"
 )
 
+var (
+	splunkContextKeyStageIDCmd = splunkContextKey("stageID")
+)
+
+type splunkContextKey string
+
+func (c splunkContextKey) String() string {
+	return "kuberium." + string(c)
+}
+
 type SplunkFlatMapStage[S apipe.Messager] struct {
 	f   func(S) []S
 	cfg aconfigurable.Configurabler
@@ -52,7 +62,8 @@ func (st *SplunkFlatMapStage[S]) Action(ctx context.Context, in <-chan S, prms .
 	default:
 		return nil, errortree.Add(rcerror, "SplunkFlatMapStage.Action", errors.New("wrong number of prms"))
 	}
-
+	n, _ := st.cfg.GetString("name")
+	ct := context.WithValue(ctx, splunkContextKeyStageIDCmd, n)
 	go func() {
 		defer func() {
 			for _, ch := range outs {
@@ -61,13 +72,12 @@ func (st *SplunkFlatMapStage[S]) Action(ctx context.Context, in <-chan S, prms .
 		}()
 		// flatmap stage doesn't support pool of workers
 		if workers == 1 {
-			if err := doFlatMap[S](ctx, in, hf, outs[0]); err != nil {
-				n, _ := st.cfg.GetString("name")
-				fmt.Printf("[DBG]Closing staging %s", n)
+			err := doFlatMap[S](ct, in, hf, outs[0])
+			if err != nil && len(in) == 0 {
+				fmt.Printf("[DBG]Closing staging %s\n", n)
 				return
 			}
 		}
-
 	}()
 
 	return outs[0], nil
@@ -79,8 +89,7 @@ func doFlatMap[S apipe.Messager](ctx context.Context, in <-chan S, f func(S) []S
 	for {
 		select {
 		case <-ctx.Done():
-			// fmt.Println("[DBG]Context done. Terminating FlatmapStage")
-			return nil
+			fmt.Printf("[DBG]doFlatMap: Context done [%s]\n", ctx.Value(splunkContextKeyStageIDCmd))
 		case s, more := <-in:
 			if !more { //
 				// fmt.Println("[DBG]doFlatMap input channel closed")
@@ -95,12 +104,13 @@ func doFlatMap[S apipe.Messager](ctx context.Context, in <-chan S, f func(S) []S
 // It blocks until the channel is closed or the provided context is cancelled.
 func sendAll[S any](ctx context.Context, ts []S, ch chan<- S) {
 
-	// fmt.Printf("[DBG]sendAll len: %d\n", len(ts))
 	for _, t := range ts {
 		select {
 		case <-ctx.Done():
+			fmt.Printf("[DBG]sendAll: len=%d -> Context cancelled [%s]\n", len(ts), ctx.Value(splunkContextKeyStageIDCmd))
 			return
 		case ch <- t:
+			fmt.Printf("[DBG]sendAll: len=%d -> Sended [%s]\n", len(ts), ctx.Value(splunkContextKeyStageIDCmd))
 		}
 	}
 }
