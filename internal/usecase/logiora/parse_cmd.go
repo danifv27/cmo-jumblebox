@@ -88,12 +88,16 @@ func (cmd *MatchCmd) Run(cli *CLI) error {
 	// Pipeline stages
 	// Regexp parse
 	regexParserStg := stage.NewRegexParse(cli.Parse.Format)
-	st := isplunk.NewSplunkFlatMapStage[isplunk.SplunkPipeMsg](regexParserStg.Do, isplunk.WithName("regexParser"), isplunk.WithBufferSize(3))
+	st := isplunk.NewSplunkFlatMapStage[isplunk.SplunkPipeMsg](regexParserStg.Do, isplunk.WithName("regexParser"), isplunk.WithBufferSize(0))
 	ppln.Next(st)
 	// Check unique ip
 	ipStg := stage.NewIpSet(true, "http_x_original_forwarded_for")
 	ipset := isplunk.NewSplunkFlatMapStage[isplunk.SplunkPipeMsg](ipStg.Do, isplunk.WithName("ipSet"))
 	ppln.Next(ipset)
+	// Match subnets
+	matchStg := stage.NewMatchSubnet(cli.Parse.File.Match.Whitelist.Whitelist)
+	matchsubnet := isplunk.NewSplunkFlatMapStage[isplunk.SplunkPipeMsg](matchStg.Do, isplunk.WithName("matchSubnet"))
+	ppln.Next(matchsubnet)
 
 	// Pipeline source
 	entriesCh, errorsCh, err := follow.Lines(ctx)

@@ -50,6 +50,7 @@ func (p *IpSet) Do(input isplunk.SplunkPipeMsg) []isplunk.SplunkPipeMsg {
 				}
 				outMsg.Add("ipset", p.set)
 				outMsg.Add("ips", p.ips)
+				outMsg.Set("lastuniqueip", ip)
 				return append(outMsgs, outMsg)
 			}
 		}

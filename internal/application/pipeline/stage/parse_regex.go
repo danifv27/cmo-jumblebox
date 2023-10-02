@@ -53,7 +53,7 @@ func (p *RegexParse) Do(input isplunk.SplunkPipeMsg) []isplunk.SplunkPipeMsg {
 		fields := re.FindStringSubmatch(val)
 		if len(fields) > 0 {
 			// fmt.Printf("[DBG]regexp fields: %v", fields)
-			outMsg := isplunk.NewSplunkMessage("parsed.fields", nil)
+			outMsg := isplunk.NewSplunkMessage("regex.fields", nil)
 			m := make(map[string]string)
 			for i, name := range re.SubexpNames() {
 				if i == 0 {
