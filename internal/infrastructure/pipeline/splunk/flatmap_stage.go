@@ -18,7 +18,7 @@ var (
 type splunkContextKey string
 
 func (c splunkContextKey) String() string {
-	return "kuberium." + string(c)
+	return "splunk." + string(c)
 }
 
 type SplunkFlatMapStage[S apipe.Messager] struct {
@@ -107,10 +107,10 @@ func sendAll[S any](ctx context.Context, ts []S, ch chan<- S) {
 	for _, t := range ts {
 		select {
 		case <-ctx.Done():
-			fmt.Printf("[DBG]sendAll: len=%d -> Context cancelled [%s]\n", len(ts), ctx.Value(splunkContextKeyStageIDCmd))
+			// fmt.Printf("[DBG]sendAll: len=%d -> Context cancelled [%s]\n", len(ts), ctx.Value(splunkContextKeyStageIDCmd))
 			return
 		case ch <- t:
-			fmt.Printf("[DBG]sendAll: len=%d -> Sended [%s]\n", len(ts), ctx.Value(splunkContextKeyStageIDCmd))
+			// fmt.Printf("[DBG]sendAll: len=%d -> Sended [%s]\n", len(ts), ctx.Value(splunkContextKeyStageIDCmd))
 		}
 	}
 }

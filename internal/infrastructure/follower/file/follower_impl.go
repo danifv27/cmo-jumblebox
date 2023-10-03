@@ -3,7 +3,6 @@ package file
 import (
 	"bufio"
 	"context"
-	"fmt"
 	"io"
 	"os"
 
@@ -78,7 +77,7 @@ func (r *Reader) Lines(ctx context.Context) (chan string, chan error, error) {
 					return
 				} else {
 					r.lines <- line
-					fmt.Printf("[DBG]Line sended\n")
+					//fmt.Printf("[DBG]Line sended\n")
 				}
 			}
 		}

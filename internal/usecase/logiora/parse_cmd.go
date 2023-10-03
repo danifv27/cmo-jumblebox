@@ -95,9 +95,12 @@ func (cmd *MatchCmd) Run(cli *CLI) error {
 	ipset := isplunk.NewSplunkFlatMapStage[isplunk.SplunkPipeMsg](ipStg.Do, isplunk.WithName("ipSet"))
 	ppln.Next(ipset)
 	// Match subnets
-	matchStg := stage.NewMatchSubnet(cli.Parse.File.Match.Whitelist.Whitelist)
-	matchsubnet := isplunk.NewSplunkFlatMapStage[isplunk.SplunkPipeMsg](matchStg.Do, isplunk.WithName("matchSubnet"))
-	ppln.Next(matchsubnet)
+	if matchStg, err := stage.NewMatchSubnet(cli.Parse.File.Match.Whitelist.Whitelist); err != nil {
+		return errortree.Add(rcerror, "matchcmd.do", err)
+	} else {
+		matchsubnet := isplunk.NewSplunkFlatMapStage[isplunk.SplunkPipeMsg](matchStg.Do, isplunk.WithName("matchSubnet"))
+		ppln.Next(matchsubnet)
+	}
 
 	// Pipeline source
 	entriesCh, errorsCh, err := follow.Lines(ctx)
