@@ -2,18 +2,22 @@ package logiora
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
+	"sort"
 	"syscall"
 
 	apipe "fry.org/qft/jumble/internal/application/pipeline"
 	"fry.org/qft/jumble/internal/application/pipeline/stage"
+	"fry.org/qft/jumble/internal/application/printer"
 	ifollower "fry.org/qft/jumble/internal/infrastructure/follower/file"
 	ipipe "fry.org/qft/jumble/internal/infrastructure/pipeline"
 	isplunk "fry.org/qft/jumble/internal/infrastructure/pipeline/splunk"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/speijnik/go-errortree"
+	"github.com/tidwall/pretty"
 )
 
 type ParseCmd struct {
@@ -29,6 +33,7 @@ type MatchCmd struct {
 	Whitelist struct {
 		Whitelist string `kong:"arg,help='Whitelisted ranges'"`
 	} `kong:"arg"`
+	lastMsg isplunk.SplunkPipeMsg
 }
 
 func do(ctx context.Context, cancel context.CancelFunc, pipe apipe.Piper[isplunk.SplunkPipeMsg], entries chan string, errs chan error) (<-chan isplunk.SplunkPipeMsg, error) {
@@ -76,7 +81,6 @@ func (cmd *MatchCmd) Run(cli *CLI) error {
 	var rcerror, err error
 	var ppln apipe.Piper[isplunk.SplunkPipeMsg]
 	var outCh <-chan isplunk.SplunkPipeMsg
-	var lastMsg interface{}
 
 	//The source of the pipeline are the lines from the log file
 	follow := ifollower.NewFollower(cli.Parse.File.File)
@@ -124,7 +128,7 @@ mainLoop:
 				fmt.Printf("[DBG]Run: No more items. Stopping main loop\n")
 				break mainLoop
 			}
-			lastMsg = msg.DeepCopy()
+			cmd.lastMsg = msg.DeepCopy()
 			count++
 		case <-ctx.Done():
 			fmt.Printf("[DBG]Run: context cancelled. Stopping main loop\n")
@@ -133,9 +137,84 @@ mainLoop:
 		// fmt.Printf("[DBG] len(outCh)=%d\n", len(outCh))
 	}
 	fmt.Printf("[DBG]Total entry processed: %d\n", count)
-	spew.Dump(lastMsg)
+	cmd.Print(printer.PrinterModeJSON)
 	fmt.Println("[DBG] Goodbye parse <file> match <whitelist>")
 	cancel()
+
+	return nil
+}
+
+func (cmd *MatchCmd) Print(mode printer.PrinterMode) error {
+	var rcerror error
+
+	rcerror = errortree.Add(rcerror, "matchcmd.Print", fmt.Errorf("printer mode %v not supported", mode))
+
+	switch mode {
+	case printer.PrinterModeJSON:
+		rcerror = printJSON(cmd.lastMsg)
+	case printer.PrinterModeTable:
+	case printer.PrinterModeText:
+	}
+
+	return rcerror
+}
+
+func printJSON(msg isplunk.SplunkPipeMsg) error {
+	type iplist struct {
+		Len int
+		IPs []string
+	}
+	type ips struct {
+		Active  iplist
+		Unknown iplist
+	}
+	type outputJSON struct {
+		IPs ips
+	}
+	var rcerror error
+	var jsonData outputJSON
+	var activeIPs, unknownIPs iplist
+
+	if activeips, ok := msg.Get(stage.ActiveIps).(map[string]bool); !ok {
+		return errortree.Add(rcerror, "printOutputJSON", errors.New("data type mismatch"))
+	} else {
+		activeIPs = iplist{
+			Len: len(activeips),
+			IPs: make([]string, 0, len(activeips)),
+		}
+		for ip, _ := range activeips {
+			activeIPs.IPs = append(activeIPs.IPs, ip)
+		}
+		// sort the slice by keys
+		sort.Strings(activeIPs.IPs)
+	}
+
+	if unknownips, ok := msg.Get(stage.UnknonwIps).(map[string]bool); !ok {
+		return errortree.Add(rcerror, "printOutputJSON", errors.New("data type mismatch"))
+	} else {
+		unknownIPs = iplist{
+			Len: len(unknownips),
+			IPs: make([]string, 0, len(unknownips)),
+		}
+		for ip, _ := range unknownips {
+			unknownIPs.IPs = append(unknownIPs.IPs, ip)
+		}
+		// sort the slice by keys
+		sort.Strings(unknownIPs.IPs)
+	}
+
+	jsonData = outputJSON{
+		IPs: ips{
+			Active:  activeIPs,
+			Unknown: unknownIPs,
+		},
+	}
+	// Convert structs to JSON.
+	if j, err := json.Marshal(jsonData); err != nil {
+		return errortree.Add(rcerror, "printOutputJSON", err)
+	} else {
+		fmt.Printf("%s\n", pretty.Pretty(j))
+	}
 
 	return nil
 }
