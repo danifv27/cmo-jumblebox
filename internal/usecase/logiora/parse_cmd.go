@@ -165,17 +165,23 @@ func printJSON(msg isplunk.SplunkPipeMsg) error {
 		IPs []string
 	}
 	type ips struct {
-		Active  iplist
+		Allowed iplist
 		Unknown iplist
 	}
+	type cidrs struct {
+		Active   iplist
+		Inactive iplist
+	}
 	type outputJSON struct {
-		IPs ips
+		IPs         ips
+		Whitelisted cidrs
 	}
 	var rcerror error
 	var jsonData outputJSON
 	var activeIPs, unknownIPs iplist
+	var activeCIDRs, inactiveCIDRs iplist
 
-	if activeips, ok := msg.Get(stage.ActiveIps).(map[string]bool); !ok {
+	if activeips, ok := msg.Get(stage.AllowedIpsStageKey).(map[string]bool); !ok {
 		return errortree.Add(rcerror, "printOutputJSON", errors.New("data type mismatch"))
 	} else {
 		activeIPs = iplist{
@@ -189,7 +195,7 @@ func printJSON(msg isplunk.SplunkPipeMsg) error {
 		sort.Strings(activeIPs.IPs)
 	}
 
-	if unknownips, ok := msg.Get(stage.UnknonwIps).(map[string]bool); !ok {
+	if unknownips, ok := msg.Get(stage.UnknonwIpsStageKey).(map[string]bool); !ok {
 		return errortree.Add(rcerror, "printOutputJSON", errors.New("data type mismatch"))
 	} else {
 		unknownIPs = iplist{
@@ -203,10 +209,42 @@ func printJSON(msg isplunk.SplunkPipeMsg) error {
 		sort.Strings(unknownIPs.IPs)
 	}
 
+	if activecidrs, ok := msg.Get(stage.ActiveSubnetsStageKey).(map[string]bool); !ok {
+		return errortree.Add(rcerror, "printOutputJSON", errors.New("data type mismatch"))
+	} else {
+		activeCIDRs = iplist{
+			Len: len(activecidrs),
+			IPs: make([]string, 0, len(activecidrs)),
+		}
+		for ip, _ := range activecidrs {
+			activeCIDRs.IPs = append(activeCIDRs.IPs, ip)
+		}
+		// sort the slice by keys
+		sort.Strings(activeCIDRs.IPs)
+	}
+
+	if inactivecidrs, ok := msg.Get(stage.InactiveSubnetsStageKey).(map[string]bool); !ok {
+		return errortree.Add(rcerror, "printOutputJSON", errors.New("data type mismatch"))
+	} else {
+		inactiveCIDRs = iplist{
+			Len: len(inactivecidrs),
+			IPs: make([]string, 0, len(inactivecidrs)),
+		}
+		for ip, _ := range inactivecidrs {
+			inactiveCIDRs.IPs = append(inactiveCIDRs.IPs, ip)
+		}
+		// sort the slice by keys
+		sort.Strings(inactiveCIDRs.IPs)
+	}
+
 	jsonData = outputJSON{
 		IPs: ips{
-			Active:  activeIPs,
+			Allowed: activeIPs,
 			Unknown: unknownIPs,
+		},
+		Whitelisted: cidrs{
+			Active:   activeCIDRs,
+			Inactive: inactiveCIDRs,
 		},
 	}
 	// Convert structs to JSON.

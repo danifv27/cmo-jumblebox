@@ -11,10 +11,10 @@ import (
 )
 
 const (
-	ActiveSubnets   = "activecidr"   // subnets that contains a logged ip
-	InactiveSubnets = "inactivecidr" // asubnets without matching logged ip
-	ActiveIps       = "activeips"    // valid ips
-	UnknonwIps      = "unknownips"   // ips that do not pertain to whitelisted subnets
+	ActiveSubnetsStageKey   = "activecidr"   // subnets that contains a logged ip
+	InactiveSubnetsStageKey = "inactivecidr" // asubnets without matching logged ip
+	AllowedIpsStageKey      = "allowedips"   //ips used to connect and are whitelisted
+	UnknonwIpsStageKey      = "unknownips"   // ips used to connect and are not whitelisted
 )
 
 // IpSet contains unique ip address
@@ -115,10 +115,10 @@ func (m *MatchSubnet) Do(input isplunk.SplunkPipeMsg) []isplunk.SplunkPipeMsg {
 				m.unknowncidr[last] = true
 			}
 		}
-		outMsg.Add(InactiveSubnets, m.inactivesubnets)
-		outMsg.Add(ActiveSubnets, m.activesubnets)
-		outMsg.Add(UnknonwIps, m.unknowncidr)
-		outMsg.Add(ActiveIps, m.activecidr)
+		outMsg.Add(InactiveSubnetsStageKey, m.inactivesubnets)
+		outMsg.Add(ActiveSubnetsStageKey, m.activesubnets)
+		outMsg.Add(UnknonwIpsStageKey, m.unknowncidr)
+		outMsg.Add(AllowedIpsStageKey, m.activecidr)
 
 		return append(outMsgs, outMsg)
 	}
