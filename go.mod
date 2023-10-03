@@ -9,7 +9,9 @@ require (
 	github.com/onsi/gomega v1.27.10
 	github.com/sirupsen/logrus v1.9.3
 	github.com/speijnik/go-errortree v1.0.1
+	github.com/tidwall/pretty v1.2.1
 	github.com/un000/tailor v0.3.0
+	github.com/yl2chen/cidranger v1.0.2
 )
 
 require (
@@ -18,6 +20,7 @@ require (
 	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/pprof v0.0.0-20210407192527-94a9f03dee38 // indirect
 	github.com/pkg/errors v0.8.1 // indirect
+	github.com/stretchr/testify v1.8.4 // indirect
 	golang.org/x/net v0.12.0 // indirect
 	golang.org/x/sys v0.10.0 // indirect
 	golang.org/x/text v0.11.0 // indirect

@@ -10,15 +10,22 @@ import (
 	"github.com/yl2chen/cidranger"
 )
 
+const (
+	ActiveSubnets   = "activecidr"   // subnets that contains a logged ip
+	InactiveSubnets = "inactivecidr" // asubnets without matching logged ip
+	ActiveIps       = "activeips"    // valid ips
+	UnknonwIps      = "unknownips"   // ips that do not pertain to whitelisted subnets
+)
+
 // IpSet contains unique ip address
 type MatchSubnet struct {
-	whitelist          string
-	file               *os.File
-	ranger             cidranger.Ranger
-	usedsubnets        map[string]bool
-	nonusedsubnets     map[string]bool
-	whitelistedcidr    map[string]bool
-	nonwhitelistedcidr map[string]bool
+	whitelist       string
+	file            *os.File
+	ranger          cidranger.Ranger
+	activesubnets   map[string]bool
+	inactivesubnets map[string]bool
+	activecidr      map[string]bool
+	unknowncidr     map[string]bool
 }
 
 // openFile opens the file for reading.
@@ -39,12 +46,12 @@ func NewMatchSubnet(file string) (*MatchSubnet, error) {
 		whitelist: file,
 		ranger:    cidranger.NewPCTrieRanger(),
 		//Whitelisted subnets used to connect
-		usedsubnets: make(map[string]bool),
+		activesubnets: make(map[string]bool),
 		//Whitelisted subnets not used to connect
-		nonusedsubnets:  make(map[string]bool),
-		whitelistedcidr: make(map[string]bool),
+		inactivesubnets: make(map[string]bool),
+		activecidr:      make(map[string]bool),
 		// IPs not whitelisted
-		nonwhitelistedcidr: make(map[string]bool),
+		unknowncidr: make(map[string]bool),
 	}
 
 	defer func() {
@@ -64,8 +71,8 @@ func NewMatchSubnet(file string) (*MatchSubnet, error) {
 			address := cidranger.NewBasicRangerEntry(*network1)
 			match.ranger.Insert(address)
 			ipnet := address.Network()
-			if !match.nonusedsubnets[(&ipnet).String()] {
-				match.nonusedsubnets[(&ipnet).String()] = true
+			if !match.inactivesubnets[(&ipnet).String()] {
+				match.inactivesubnets[(&ipnet).String()] = true
 			}
 		}
 	}
@@ -82,7 +89,7 @@ func (m *MatchSubnet) Do(input isplunk.SplunkPipeMsg) []isplunk.SplunkPipeMsg {
 	var outMsgs []isplunk.SplunkPipeMsg
 	var contains bool
 
-	if last, ok := input.Get("lastuniqueip").(string); ok {
+	if last, ok := input.Get(LastUniqueIpStageKey).(string); ok {
 		outMsg := isplunk.NewSplunkMessage("match.subnets", nil)
 		ip := net.ParseIP(last)
 		if contains, err = m.ranger.Contains(ip); err != nil {
@@ -94,24 +101,24 @@ func (m *MatchSubnet) Do(input isplunk.SplunkPipeMsg) []isplunk.SplunkPipeMsg {
 			} else {
 				for _, cidr := range nets {
 					p := cidr.Network()
-					if m.nonusedsubnets[(&p).String()] {
-						delete(m.nonusedsubnets, (&p).String())
-						m.usedsubnets[(&p).String()] = true
+					if m.inactivesubnets[(&p).String()] {
+						delete(m.inactivesubnets, (&p).String())
+						m.activesubnets[(&p).String()] = true
 					}
 				}
-				if !m.whitelistedcidr[last] {
-					m.whitelistedcidr[last] = true
+				if !m.activecidr[last] {
+					m.activecidr[last] = true
 				}
 			}
 		} else {
-			if !m.nonwhitelistedcidr[last] {
-				m.nonwhitelistedcidr[last] = true
+			if !m.unknowncidr[last] {
+				m.unknowncidr[last] = true
 			}
 		}
-		outMsg.Add("nonusedsubnets", m.nonusedsubnets)
-		outMsg.Add("usedsubnets", m.usedsubnets)
-		outMsg.Add("nonwhitelistedips", m.nonwhitelistedcidr)
-		outMsg.Add("whitelistedips", m.whitelistedcidr)
+		outMsg.Add(InactiveSubnets, m.inactivesubnets)
+		outMsg.Add(ActiveSubnets, m.activesubnets)
+		outMsg.Add(UnknonwIps, m.unknowncidr)
+		outMsg.Add(ActiveIps, m.activecidr)
 
 		return append(outMsgs, outMsg)
 	}

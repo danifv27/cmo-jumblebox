@@ -8,6 +8,12 @@ import (
 	"github.com/speijnik/go-errortree"
 )
 
+const (
+	IPSetStageKey        = "ipset"        // map[string]bool with unique ips
+	IPListStageKey       = "ips"          // array with IPSetStageKey map keys
+	LastUniqueIpStageKey = "lastuniqueip" // last unique ip processed
+)
+
 // IpSet contains unique ip address
 type IpSet struct {
 	field          string
@@ -41,16 +47,16 @@ func (p *IpSet) insert(key string) error {
 func (p *IpSet) Do(input isplunk.SplunkPipeMsg) []isplunk.SplunkPipeMsg {
 	var outMsgs []isplunk.SplunkPipeMsg
 
-	if val, ok := input.Get("fields").(map[string]string); ok {
+	if val, ok := input.Get(ParsedFieldsStageKey).(map[string]string); ok {
 		outMsg := isplunk.NewSplunkMessage("unique.ips", nil)
 		if ip, exists := val[p.field]; exists {
 			if net.ParseIP(ip) != nil {
 				if err := p.insert(ip); err != nil {
 					return outMsgs
 				}
-				outMsg.Add("ipset", p.set)
-				outMsg.Add("ips", p.ips)
-				outMsg.Set("lastuniqueip", ip)
+				outMsg.Add(IPSetStageKey, p.set)
+				outMsg.Add(IPListStageKey, p.ips)
+				outMsg.Set(LastUniqueIpStageKey, ip)
 				return append(outMsgs, outMsg)
 			}
 		}
