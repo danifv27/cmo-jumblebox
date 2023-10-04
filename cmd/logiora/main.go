@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
+	alogger "fry.org/qft/jumble/internal/application/logger"
+	ilogger "fry.org/qft/jumble/internal/infrastructure/logger"
 	"fry.org/qft/jumble/internal/usecase/logiora"
 	"github.com/alecthomas/kong"
 	"github.com/speijnik/go-errortree"
@@ -37,15 +39,20 @@ func getConfigPaths() ([]string, error) {
 func main() {
 	var err, rcerror error
 	var configs []string
+	var lg alogger.Logger
 
 	cli := logiora.CLI{}
 	if configs, err = getConfigPaths(); err != nil {
 		panic(err)
 	}
 	bin := filepath.Base(os.Args[0])
+	if lg, _, _, err = ilogger.Parse("logger:logrus"); err != nil {
+		panic(err)
+	}
 	//config file has precedence over envars
 	ctx := kong.Parse(&cli,
 		kong.Name(bin),
+		kong.BindTo(lg, (*alogger.Logger)(nil)),
 		kong.Description("Log Parser"),
 		kong.UsageOnError(),
 		kong.ConfigureHelp(kong.HelpOptions{

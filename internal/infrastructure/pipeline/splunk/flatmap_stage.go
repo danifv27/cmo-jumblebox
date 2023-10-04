@@ -3,7 +3,6 @@ package splunk
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/speijnik/go-errortree"
 
@@ -74,7 +73,7 @@ func (st *SplunkFlatMapStage[S]) Action(ctx context.Context, in <-chan S, prms .
 		if workers == 1 {
 			err := doFlatMap[S](ct, in, hf, outs[0])
 			if err != nil && len(in) == 0 {
-				fmt.Printf("[DBG]Closing staging %s\n", n)
+				// fmt.Printf("[DBG]Closing staging %s\n", n)
 				return
 			}
 		}
@@ -89,7 +88,7 @@ func doFlatMap[S apipe.Messager](ctx context.Context, in <-chan S, f func(S) []S
 	for {
 		select {
 		case <-ctx.Done():
-			fmt.Printf("[DBG]doFlatMap: Context done [%s]\n", ctx.Value(splunkContextKeyStageIDCmd))
+			// fmt.Printf("[DBG]doFlatMap: Context done [%s]\n", ctx.Value(splunkContextKeyStageIDCmd))
 		case s, more := <-in:
 			if !more { //
 				// fmt.Println("[DBG]doFlatMap input channel closed")

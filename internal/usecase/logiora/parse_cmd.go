@@ -10,6 +10,7 @@ import (
 	"sort"
 	"syscall"
 
+	alogger "fry.org/qft/jumble/internal/application/logger"
 	apipe "fry.org/qft/jumble/internal/application/pipeline"
 	"fry.org/qft/jumble/internal/application/pipeline/stage"
 	"fry.org/qft/jumble/internal/application/printer"
@@ -22,7 +23,7 @@ import (
 
 type ParseCmd struct {
 	// Format string `kong:"help='Log format',default='$remote_addr - $remote_user [$time_local] \"$request\" $status $body_bytes_sent \"$http_referer\" \"$http_user_agent\" rt=$request_time uct=\"$upstream_connect_time\" uht=\"$upstream_header_time\" urt=\"$upstream_response_time\" x_request-id=\"$http_x_request_id\" reqid=\"$reqid\"'"`
-	Format string `kong:"help='Log format',default='$http_x_original_forwarded_for - $remote_addr - $remote_user [$time_local] - $request $status'"`
+	Format string `kong:"help='Log format to be parsed',default='$http_x_original_forwarded_for - $remote_addr - $remote_user [$time_local] - $request $status'"`
 	File   struct {
 		File  string   `kong:"arg,help='File to parse'"`
 		Match MatchCmd `kong:"cmd,help='Check if ip is whitelisted'"`
@@ -31,12 +32,12 @@ type ParseCmd struct {
 
 type MatchCmd struct {
 	Whitelist struct {
-		Whitelist string `kong:"arg,help='Whitelisted ranges'"`
+		Whitelist string `kong:"arg,help='Ranges to whitelist (cidr notation)'"`
 	} `kong:"arg"`
 	lastMsg isplunk.SplunkPipeMsg
 }
 
-func do(ctx context.Context, cancel context.CancelFunc, pipe apipe.Piper[isplunk.SplunkPipeMsg], entries chan string, errs chan error) (<-chan isplunk.SplunkPipeMsg, error) {
+func do(lg alogger.Logger, ctx context.Context, cancel context.CancelFunc, pipe apipe.Piper[isplunk.SplunkPipeMsg], entries chan string, errs chan error) (<-chan isplunk.SplunkPipeMsg, error) {
 	var rcerror, err error
 	var outCh <-chan isplunk.SplunkPipeMsg
 
@@ -49,7 +50,7 @@ func do(ctx context.Context, cancel context.CancelFunc, pipe apipe.Piper[isplunk
 			select {
 			case entry, hasMore := <-entries:
 				if !hasMore {
-					// fmt.Println("[DBG]No more entries")
+					lg.Debug("No more entries\n")
 					return
 				}
 				expected := isplunk.NewSplunkMessage("input.entry", nil)
@@ -57,11 +58,11 @@ func do(ctx context.Context, cancel context.CancelFunc, pipe apipe.Piper[isplunk
 				inCh <- expected
 			case failure, hasMore := <-errs:
 				if !hasMore || failure != nil {
-					// fmt.Println("[DBG]No more errors")
+					lg.Debug("No more errors\n")
 					return
 				}
 			case <-ctx.Done():
-				fmt.Printf("[DBG]context cancelled. Stopping source goroutine\n")
+				lg.Debug("Context cancelled. Stopping source goroutine\n")
 				return
 			}
 		}
@@ -69,7 +70,7 @@ func do(ctx context.Context, cancel context.CancelFunc, pipe apipe.Piper[isplunk
 
 	// Run the pipeline
 	if outCh, err = pipe.Do(ctx, inCh); err != nil {
-		fmt.Printf("[DBG]pipe.Do err: %s\n", err)
+		lg.Debugf("pipe.Do err: %s\n", err)
 		cancel()
 		return outCh, errortree.Add(rcerror, "matchcmd.do", err)
 	}
@@ -77,10 +78,14 @@ func do(ctx context.Context, cancel context.CancelFunc, pipe apipe.Piper[isplunk
 	return outCh, nil
 }
 
-func (cmd *MatchCmd) Run(cli *CLI) error {
+func (cmd *MatchCmd) Run(cli *CLI, lg alogger.Logger) error {
 	var rcerror, err error
 	var ppln apipe.Piper[isplunk.SplunkPipeMsg]
 	var outCh <-chan isplunk.SplunkPipeMsg
+
+	if cli.Debug {
+		lg.SetLevel(alogger.LoggerLevelDebug)
+	}
 
 	//The source of the pipeline are the lines from the log file
 	follow := ifollower.NewFollower(cli.Parse.File.File)
@@ -113,7 +118,7 @@ func (cmd *MatchCmd) Run(cli *CLI) error {
 		return errortree.Add(rcerror, "matchcmd.Run", err)
 	}
 
-	if outCh, err = do(ctx, cancel, ppln, entriesCh, errorsCh); err != nil {
+	if outCh, err = do(lg, ctx, cancel, ppln, entriesCh, errorsCh); err != nil {
 		cancel()
 		return errortree.Add(rcerror, "matchcmd.Run", err)
 	}
@@ -125,20 +130,20 @@ mainLoop:
 		select {
 		case msg, more := <-outCh:
 			if !more {
-				fmt.Printf("[DBG]Run: No more items. Stopping main loop\n")
+				lg.Debug("Run: No more items. Stopping main loop\n")
 				break mainLoop
 			}
 			cmd.lastMsg = msg.DeepCopy()
 			count++
 		case <-ctx.Done():
-			fmt.Printf("[DBG]Run: context cancelled. Stopping main loop\n")
+			lg.Debug("Run: Context cancelled. Stopping main loop\n")
 			break mainLoop
 		}
 		// fmt.Printf("[DBG] len(outCh)=%d\n", len(outCh))
 	}
-	fmt.Printf("[DBG]Total entry processed: %d\n", count)
+	lg.Debugf("Total entry processed: %d\n", count)
 	cmd.Print(printer.PrinterModeJSON)
-	fmt.Println("[DBG] Goodbye parse <file> match <whitelist>")
+	lg.Debug("Goodbye parse <file> match <whitelist>\n")
 	cancel()
 
 	return nil
@@ -181,60 +186,59 @@ func printJSON(msg isplunk.SplunkPipeMsg) error {
 	var activeIPs, unknownIPs iplist
 	var activeCIDRs, inactiveCIDRs iplist
 
-	if activeips, ok := msg.Get(stage.AllowedIpsStageKey).(map[string]bool); !ok {
-		return errortree.Add(rcerror, "printOutputJSON", errors.New("data type mismatch"))
-	} else {
+	if activeips, ok := msg.Get(stage.AllowedIpsStageKey).(map[string]bool); ok {
 		activeIPs = iplist{
 			Len: len(activeips),
 			IPs: make([]string, 0, len(activeips)),
 		}
-		for ip, _ := range activeips {
+		for ip := range activeips {
 			activeIPs.IPs = append(activeIPs.IPs, ip)
 		}
 		// sort the slice by keys
 		sort.Strings(activeIPs.IPs)
-	}
-
-	if unknownips, ok := msg.Get(stage.UnknonwIpsStageKey).(map[string]bool); !ok {
-		return errortree.Add(rcerror, "printOutputJSON", errors.New("data type mismatch"))
 	} else {
+		return errortree.Add(rcerror, "printOutputJSON", errors.New("data type mismatch"))
+	}
+	if unknownips, ok := msg.Get(stage.UnknonwIpsStageKey).(map[string]bool); ok {
 		unknownIPs = iplist{
 			Len: len(unknownips),
 			IPs: make([]string, 0, len(unknownips)),
 		}
-		for ip, _ := range unknownips {
+		for ip := range unknownips {
 			unknownIPs.IPs = append(unknownIPs.IPs, ip)
 		}
 		// sort the slice by keys
 		sort.Strings(unknownIPs.IPs)
+	} else {
+		return errortree.Add(rcerror, "printOutputJSON", errors.New("data type mismatch"))
 	}
 
-	if activecidrs, ok := msg.Get(stage.ActiveSubnetsStageKey).(map[string]bool); !ok {
-		return errortree.Add(rcerror, "printOutputJSON", errors.New("data type mismatch"))
-	} else {
+	if activecidrs, ok := msg.Get(stage.ActiveSubnetsStageKey).(map[string]bool); ok {
 		activeCIDRs = iplist{
 			Len: len(activecidrs),
 			IPs: make([]string, 0, len(activecidrs)),
 		}
-		for ip, _ := range activecidrs {
+		for ip := range activecidrs {
 			activeCIDRs.IPs = append(activeCIDRs.IPs, ip)
 		}
 		// sort the slice by keys
 		sort.Strings(activeCIDRs.IPs)
+	} else {
+		return errortree.Add(rcerror, "printOutputJSON", errors.New("data type mismatch"))
 	}
 
-	if inactivecidrs, ok := msg.Get(stage.InactiveSubnetsStageKey).(map[string]bool); !ok {
-		return errortree.Add(rcerror, "printOutputJSON", errors.New("data type mismatch"))
-	} else {
+	if inactivecidrs, ok := msg.Get(stage.InactiveSubnetsStageKey).(map[string]bool); ok {
 		inactiveCIDRs = iplist{
 			Len: len(inactivecidrs),
 			IPs: make([]string, 0, len(inactivecidrs)),
 		}
-		for ip, _ := range inactivecidrs {
+		for ip := range inactivecidrs {
 			inactiveCIDRs.IPs = append(inactiveCIDRs.IPs, ip)
 		}
 		// sort the slice by keys
 		sort.Strings(inactiveCIDRs.IPs)
+	} else {
+		return errortree.Add(rcerror, "printOutputJSON", errors.New("data type mismatch"))
 	}
 
 	jsonData = outputJSON{
