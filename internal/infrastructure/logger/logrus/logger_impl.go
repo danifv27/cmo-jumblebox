@@ -9,7 +9,28 @@ import (
 )
 
 type logger struct {
-	log *logrus.Logger
+	log   *logrus.Logger
+	level applogger.LoggerLeveler
+}
+
+func (l *logger) Debug(v ...interface{}) {
+
+	switch l.level {
+	case applogger.LoggerLevelInfo:
+		return
+	default:
+		l.log.Log(logrus.DebugLevel, v...)
+	}
+}
+
+func (l *logger) Debugf(format string, v ...interface{}) {
+
+	switch l.level {
+	case applogger.LoggerLevelInfo:
+		return
+	default:
+		l.log.Logf(logrus.DebugLevel, format, v...)
+	}
 }
 
 func (l *logger) Log(v ...interface{}) {
@@ -32,7 +53,26 @@ func (l *logger) Printf(format string, v ...interface{}) {
 	l.log.Printf(format, v...)
 }
 
-// WithFields creates a new logger based on logrus.StandardLogger().
+// SetLevel sets the logger level.
+func (l *logger) SetLevel(lvl applogger.LoggerLeveler) error {
+
+	switch lvl {
+	case applogger.LoggerLevelTrace:
+	case applogger.LoggerLevelDebug:
+		l.level = lvl
+	default:
+		l.level = applogger.LoggerLevelInfo
+	}
+
+	return nil
+}
+
+// GetLevel returns the logger level.
+func (l *logger) GetLevel() applogger.LoggerLeveler {
+
+	return l.level
+}
+
 func NewLogger(f *os.File) applogger.Logger {
 
 	gLogger := new(logger)
@@ -49,6 +89,7 @@ func NewLogger(f *os.File) applogger.Logger {
 		DisableColors:    false,
 	}
 	gLogger.log.SetFormatter(&formatter)
+	gLogger.SetLevel(applogger.LoggerLevelInfo)
 
 	return gLogger
 }
