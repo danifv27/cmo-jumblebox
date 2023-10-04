@@ -22,8 +22,8 @@ import (
 )
 
 type ParseCmd struct {
-	// Format string `kong:"help='Log format',default='$remote_addr - $remote_user [$time_local] \"$request\" $status $body_bytes_sent \"$http_referer\" \"$http_user_agent\" rt=$request_time uct=\"$upstream_connect_time\" uht=\"$upstream_header_time\" urt=\"$upstream_response_time\" x_request-id=\"$http_x_request_id\" reqid=\"$reqid\"'"`
-	Format string `kong:"help='Log format to be parsed',default='$http_x_original_forwarded_for - $remote_addr - $remote_user [$time_local] - $request $status'"`
+	Format string        `kong:"help='Log format to be parsed',default='$http_x_original_forwarded_for - $remote_addr - $remote_user [$time_local] - $request $status'"`
+	Flags  ParseCmdFlags `kong:"embed"`
 	File   struct {
 		File  string   `kong:"arg,help='File to parse'"`
 		Match MatchCmd `kong:"cmd,help='Check if ip is whitelisted'"`
@@ -142,7 +142,16 @@ mainLoop:
 		// fmt.Printf("[DBG] len(outCh)=%d\n", len(outCh))
 	}
 	lg.Debugf("Total entry processed: %d\n", count)
-	cmd.Print(printer.PrinterModeJSON)
+	m := cli.Parse.Flags.Output
+	switch {
+	case m == "json":
+		cmd.Print(printer.PrinterModeJSON)
+	case m == "excel":
+		cmd.Print(printer.PrinterModeExcel)
+	case m == "text":
+		cmd.Print(printer.PrinterModeText)
+	}
+
 	lg.Debug("Goodbye parse <file> match <whitelist>\n")
 	cancel()
 
@@ -157,6 +166,8 @@ func (cmd *MatchCmd) Print(mode printer.PrinterMode) error {
 	switch mode {
 	case printer.PrinterModeJSON:
 		rcerror = printJSON(cmd.lastMsg)
+	case printer.PrinterModeExcel:
+		rcerror = printExcel(cmd.lastMsg)
 	case printer.PrinterModeTable:
 	case printer.PrinterModeText:
 	}
