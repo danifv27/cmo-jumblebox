@@ -15,7 +15,6 @@ func (l printer) Print(v ...interface{}) {}
 
 func (l printer) Printf(format string, v ...interface{}) {}
 
-// WithFields creates a new logger based on logrus.StandardLogger().
 func NewPrinter() applogger.Printer {
 
 	return printer{}

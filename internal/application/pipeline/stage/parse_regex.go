@@ -8,6 +8,10 @@ import (
 	isplunk "fry.org/qft/jumble/internal/infrastructure/pipeline/splunk"
 )
 
+const (
+	ParsedFieldsStageKey = "regexfields" // map[string][]string with the parsed log entry
+)
+
 // RegexParse is a log record parser. Use specific constructors to initialize it.
 type RegexParse struct {
 	format string
@@ -46,7 +50,6 @@ func NewRegexParse(exp string) *RegexParse {
 }
 
 func (p *RegexParse) Do(input isplunk.SplunkPipeMsg) []isplunk.SplunkPipeMsg {
-
 	var outMsgs []isplunk.SplunkPipeMsg
 
 	if val, ok := input.Get("entry").(string); ok {
@@ -54,7 +57,7 @@ func (p *RegexParse) Do(input isplunk.SplunkPipeMsg) []isplunk.SplunkPipeMsg {
 		fields := re.FindStringSubmatch(val)
 		if len(fields) > 0 {
 			// fmt.Printf("[DBG]regexp fields: %v", fields)
-			outMsg := isplunk.NewSplunkMessage("parsed.fields", nil)
+			outMsg := isplunk.NewSplunkMessage("regex.fields", nil)
 			m := make(map[string]string)
 			for i, name := range re.SubexpNames() {
 				if i == 0 {
@@ -62,7 +65,7 @@ func (p *RegexParse) Do(input isplunk.SplunkPipeMsg) []isplunk.SplunkPipeMsg {
 				}
 				m[name] = fields[i]
 			}
-			outMsg.Add("fields", m)
+			outMsg.Add(ParsedFieldsStageKey, m)
 
 			return append(outMsgs, outMsg)
 		}
