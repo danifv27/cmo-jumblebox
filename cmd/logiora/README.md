@@ -10,9 +10,13 @@ The name is constructed to capture the essence of log analysis by combining elem
 ## Features
 
 *Log Parsing:* Logiora can parse log entries using custom log formats. You can specify the log format to be parsed as a command-line argument.
+
 *IP Whitelisting:* Logiora allows you to check if IP addresses extracted from log entries match a whitelist of IP ranges provided in CIDR notation.
+
 *Flexible Configuration:* You can configure Logiora's behavior using various command-line options, including specifying the log format, whitelist ranges, and output format.
+
 *Output Formats:* Logiora supports multiple output formats, including JSON, Excel, and plain text, to suit your reporting and analysis needs.
+
 *Pipeline Processing:* Logiora uses a pipeline-based approach to efficiently process log entries and perform IP whitelisting checks in parallel.
 
 # Versioning
