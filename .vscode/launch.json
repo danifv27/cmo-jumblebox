@@ -21,10 +21,13 @@
             "mode": "debug",
             "program": "${workspaceFolder}/cmd/logiora",
             "env": {
-                "SC_LOGIORA_PARSE_CMD": "parse ../../logs/short_xoriginalforwardedfor.log match ../../logs/short_whitelist.txt"
+                "SC_LOGIORA_PARSE_CMD": "parse ../../logs/short_xoriginalforwardedfor.log match ../../logs/short_whitelist.txt -D --output excel"
             },
             "args": [
                 "parse",
+                "-D",
+                "--output",
+                "excel",
                 "../../logs/short_xoriginalforwardedfor.log",
                 "match",
                 "../../logs/short_whitelist.txt",
