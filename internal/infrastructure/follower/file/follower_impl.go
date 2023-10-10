@@ -51,7 +51,7 @@ func (r *Reader) Lines(ctx context.Context) (chan string, chan error, error) {
 
 	r.lines = make(chan string)
 	r.errs = make(chan error)
-
+	lines := 0
 	go func() {
 		defer func() {
 			var rcerror error
@@ -65,22 +65,24 @@ func (r *Reader) Lines(ctx context.Context) (chan string, chan error, error) {
 			close(r.errs)
 		}()
 		reader := bufio.NewReader(r.file)
+	outer_loop:
 		for {
 			select {
 			case <-ctx.Done():
-				return
+				break outer_loop
 			default:
 				if line, err := reader.ReadString('\n'); err != nil {
 					if err != io.EOF {
 						r.errs <- errortree.Add(rcerror, "file.Lines.goroutine", err)
 					}
-					return
+					break outer_loop
 				} else {
 					r.lines <- line
-					//fmt.Printf("[DBG]Line sended\n")
+					lines++
 				}
 			}
 		}
+		// fmt.Printf("[DBG]Total lines readed: %d\n", lines)
 	}()
 
 	return r.lines, r.errs, nil

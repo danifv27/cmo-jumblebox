@@ -7,7 +7,7 @@
             "mode": "debug",
             "program": "${workspaceFolder}/cmd/logiora",
             "env": {
-                "SC_LOGIORA_PARSE_CMD": "parse ~/Proyectos/packagesGit/casamau/cmo-jumbleBox/logs/access.log"
+                "SC_LOGIORA_PARSE_CMD": "parse ../../logs/access.log"
             },
             "args": [
                 "tail",
@@ -30,7 +30,9 @@
                 "excel",
                 "../../logs/short_xoriginalforwardedfor.log",
                 "match",
-                "../../logs/short_whitelist.txt",
+                "--cwd",
+                "~/tmp",
+                "../../logs/whitelist.txt",
             ],
             "showLog": true
         }

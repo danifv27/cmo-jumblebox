@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"sort"
 	"syscall"
 	"time"
@@ -24,19 +25,25 @@ import (
 )
 
 type ParseCmd struct {
-	Format string        `kong:"help='Log format to be parsed',default='$http_x_original_forwarded_for - $remote_addr - $remote_user [$time_local] - $request $status'"`
+	Format string        `kong:"help='Log format to be parsed',default='$http_x_original_forwarded_for $remote_addr - $remote_user [$time_local] - $request $status'"`
 	Flags  ParseCmdFlags `kong:"embed"`
 	File   struct {
 		File  string   `kong:"arg,help='File to parse'"`
 		Match MatchCmd `kong:"cmd,help='Check if ip is whitelisted'"`
 	} `kong:"arg"`
+	lg alogger.Logger
 }
 
 type MatchCmd struct {
+	Flags     MatchCmdFlags `kong:"embed"`
 	Whitelist struct {
 		Whitelist string `kong:"arg,help='Ranges to whitelist (cidr notation)'"`
 	} `kong:"arg"`
 	lastMsg isplunk.SplunkPipeMsg
+}
+
+type MatchCmdFlags struct {
+	Cwd string `kong:"type='existingdir',default='./',help='Specifies the current working directory'"`
 }
 
 func do(lg alogger.Logger, ctx context.Context, cancel context.CancelFunc, pipe apipe.Piper[isplunk.SplunkPipeMsg], entries chan string, errs chan error) (<-chan isplunk.SplunkPipeMsg, error) {
@@ -80,7 +87,7 @@ func do(lg alogger.Logger, ctx context.Context, cancel context.CancelFunc, pipe 
 	return outCh, nil
 }
 
-func (cmd *MatchCmd) Run(cli *CLI, lg alogger.Logger) error {
+func (cmd *ParseCmd) Run(cli *CLI, lg alogger.Logger) error {
 	var rcerror, err error
 	var ppln apipe.Piper[isplunk.SplunkPipeMsg]
 	var outCh <-chan isplunk.SplunkPipeMsg
@@ -88,6 +95,7 @@ func (cmd *MatchCmd) Run(cli *CLI, lg alogger.Logger) error {
 	if cli.Debug {
 		lg.SetLevel(alogger.LoggerLevelDebug)
 	}
+	cmd.lg = lg
 
 	//The source of the pipeline are the lines from the log file
 	follow := ifollower.NewFollower(cli.Parse.File.File)
@@ -135,7 +143,7 @@ mainLoop:
 				lg.Debug("Run: No more items. Stopping main loop\n")
 				break mainLoop
 			}
-			cmd.lastMsg = msg.DeepCopy()
+			cmd.File.Match.lastMsg = msg.DeepCopy()
 			count++
 		case <-ctx.Done():
 			lg.Debug("Run: Context cancelled. Stopping main loop\n")
@@ -160,16 +168,16 @@ mainLoop:
 	return err
 }
 
-func (cmd *MatchCmd) Print(mode printer.PrinterMode) error {
+func (cmd *ParseCmd) Print(mode printer.PrinterMode) error {
 	var rcerror error
 
 	rcerror = errortree.Add(rcerror, "matchcmd.Print", fmt.Errorf("printer mode %v not supported", mode))
 
 	switch mode {
 	case printer.PrinterModeJSON:
-		rcerror = printJSON(cmd.lastMsg)
+		rcerror = printJSON(cmd.File.Match.lastMsg)
 	case printer.PrinterModeExcel:
-		rcerror = printExcel(cmd.lastMsg)
+		rcerror = printExcel(cmd.File.Match.lastMsg, cmd.lg, cmd.File.Match.Flags.Cwd)
 	case printer.PrinterModeTable:
 	case printer.PrinterModeText:
 	}
@@ -177,7 +185,7 @@ func (cmd *MatchCmd) Print(mode printer.PrinterMode) error {
 	return rcerror
 }
 
-func printExcel(msg isplunk.SplunkPipeMsg) error {
+func printExcel(msg isplunk.SplunkPipeMsg, lg alogger.Logger, cwd string) error {
 	var rcerror, err error
 	var addr string
 	var headerStyle, titleStyle, subheaderStyle int
@@ -198,7 +206,7 @@ func printExcel(msg isplunk.SplunkPipeMsg) error {
 	}
 	// custom rows height
 	height := map[int]float64{
-		1: 36, 2: 10, 3: 28, 4: 20,
+		1: 36, 2: 10, 3: 28, 4: 28,
 	}
 
 	//Set header value
@@ -217,9 +225,11 @@ func printExcel(msg isplunk.SplunkPipeMsg) error {
 		}
 	}
 	// set custom column width
-	if err = f.SetColWidth(sheetName, "B", "E", 16.5); err != nil {
+	if err = f.SetColWidth(sheetName, "B", "E", 24); err != nil {
 		return errortree.Add(rcerror, "printExcel", err)
 	}
+
+	// Title
 	// merge cell for the 'Analisys'
 	if err = f.MergeCell(sheetName, "B1", "E1"); err != nil {
 		return errortree.Add(rcerror, "printExcel", err)
@@ -234,12 +244,13 @@ func printExcel(msg isplunk.SplunkPipeMsg) error {
 	if err = f.SetCellStyle(sheetName, "B1", "E1", titleStyle); err != nil {
 		return errortree.Add(rcerror, "printExcel", err)
 	}
-	//Table headers
+
+	// Table headers
 	// merge cell for the 'headers'
-	if err = f.MergeCell(sheetName, "B1", "C1"); err != nil {
+	if err = f.MergeCell(sheetName, "B3", "C3"); err != nil {
 		return errortree.Add(rcerror, "printExcel", err)
 	}
-	if err = f.MergeCell(sheetName, "D1", "E1"); err != nil {
+	if err = f.MergeCell(sheetName, "D3", "E3"); err != nil {
 		return errortree.Add(rcerror, "printExcel", err)
 	}
 	// define style for the headers
@@ -260,7 +271,10 @@ func printExcel(msg isplunk.SplunkPipeMsg) error {
 		Font:      &excelize.Font{Color: "1f7f3b", Bold: true, Family: "Arial"},
 		Fill:      excelize.Fill{Type: "pattern", Color: []string{"E6F4EA"}, Pattern: 1},
 		Alignment: &excelize.Alignment{Vertical: "center", Horizontal: "center"},
-		Border:    []excelize.Border{{Type: "top", Style: 2, Color: "1f7f3b"}},
+		Border: []excelize.Border{
+			{Type: "top", Style: 2, Color: "1f7f3b"},
+			{Type: "bottom", Style: 2, Color: "1f7f3b"},
+		},
 	}); err != nil {
 		return errortree.Add(rcerror, "printExcel", err)
 	}
@@ -326,9 +340,11 @@ func printExcel(msg isplunk.SplunkPipeMsg) error {
 		return errortree.Add(rcerror, "printExcel", errors.New("data type mismatch"))
 	}
 	// Save spreadsheet by the given path.
-	if err := f.SaveAs(fmt.Sprintf("users-%s.xlsx", t.Format("01-02-2006"))); err != nil {
+	filename := filepath.Join(cwd, fmt.Sprintf("parsedIps-%s.xlsx", t.Format("2006-01-02T15:04:05Z")))
+	if err := f.SaveAs(filename); err != nil {
 		return errortree.Add(rcerror, "printExcel", err)
 	}
+	lg.Debugf("%s created succesfully", filename)
 
 	return nil
 }
