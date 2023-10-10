@@ -1,0 +1,40 @@
+{
+    "configurations": [
+        {
+            "name": "tail",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}/cmd/logiora",
+            "env": {
+                "SC_LOGIORA_PARSE_CMD": "parse ../../logs/access.log"
+            },
+            "args": [
+                "tail",
+                "../../logs/short_access.log"
+            ],
+            "showLog": true
+        },{
+            "name": "parse",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}/cmd/logiora",
+            "env": {
+                "SC_LOGIORA_PARSE_CMD": "parse ../../logs/short_xoriginalforwardedfor.log match ../../logs/short_whitelist.txt -D --output excel"
+            },
+            "args": [
+                "parse",
+                "-D",
+                "--output",
+                "excel",
+                "../../logs/short_xoriginalforwardedfor.log",
+                "match",
+                "--cwd",
+                "~/tmp",
+                "../../logs/whitelist.txt",
+            ],
+            "showLog": true
+        }
+    ]
+}
