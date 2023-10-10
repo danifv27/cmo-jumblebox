@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"sort"
+	"strings"
 	"syscall"
 	"time"
 
@@ -59,7 +60,6 @@ func do(lg alogger.Logger, ctx context.Context, cancel context.CancelFunc, pipe 
 			select {
 			case entry, hasMore := <-entries:
 				if !hasMore {
-					lg.Debug("No more entries\n")
 					return
 				}
 				expected := isplunk.NewSplunkMessage("input.entry", nil)
@@ -67,7 +67,6 @@ func do(lg alogger.Logger, ctx context.Context, cancel context.CancelFunc, pipe 
 				inCh <- expected
 			case failure, hasMore := <-errs:
 				if !hasMore || failure != nil {
-					lg.Debug("No more errors\n")
 					return
 				}
 			case <-ctx.Done():
@@ -150,7 +149,7 @@ mainLoop:
 			break mainLoop
 		}
 	}
-	lg.Debugf("Total entry processed: %d\n", count)
+	lg.Debugf("Total entries processed: %d\n", count)
 	m := cli.Parse.Flags.Output
 	err = nil
 	switch {
@@ -162,7 +161,6 @@ mainLoop:
 		err = cmd.Print(printer.PrinterModeText)
 	}
 
-	lg.Debug("Goodbye parse <file> match <whitelist>\n")
 	cancel()
 
 	return err
@@ -202,7 +200,7 @@ func printExcel(msg isplunk.SplunkPipeMsg, lg alogger.Logger, cwd string) error 
 	header := map[int][]interface{}{
 		1: {"Log Analysis"},
 		3: {"Logged IPs", "", "Allowed CIDR", ""},
-		4: {"Active", "Not Whitelisted", "Used", "Not Used"},
+		4: {"Active PDM/Flex List", "Other List", "Used PDM/Flex", "Unused PDM/Flex"},
 	}
 	// custom rows height
 	height := map[int]float64{
@@ -340,7 +338,8 @@ func printExcel(msg isplunk.SplunkPipeMsg, lg alogger.Logger, cwd string) error 
 		return errortree.Add(rcerror, "printExcel", errors.New("data type mismatch"))
 	}
 	// Save spreadsheet by the given path.
-	filename := filepath.Join(cwd, fmt.Sprintf("parsedIps-%s.xlsx", t.Format("2006-01-02T15:04:05Z")))
+	ts := t.UTC().Format(time.RFC3339)
+	filename := filepath.Join(cwd, fmt.Sprintf("parsedIps-%s.xlsx", strings.Replace(strings.Replace(ts, ":", "", -1), "-", "", -1)))
 	if err := f.SaveAs(filename); err != nil {
 		return errortree.Add(rcerror, "printExcel", err)
 	}

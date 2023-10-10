@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	alogger "fry.org/qft/jumble/internal/application/logger"
 	ilogger "fry.org/qft/jumble/internal/infrastructure/logger"
@@ -38,9 +39,13 @@ func getConfigPaths() ([]string, error) {
 
 func main() {
 	var err, rcerror error
+	var ctx *kong.Context
 	var configs []string
 	var lg alogger.Logger
 
+	defer func(start time.Time) {
+		lg.Debugf("%s took %s", ctx.Command(), time.Since(start))
+	}(time.Now())
 	cli := logiora.CLI{}
 	if configs, err = getConfigPaths(); err != nil {
 		panic(err)
@@ -50,7 +55,7 @@ func main() {
 		panic(err)
 	}
 	//config file has precedence over envars
-	ctx := kong.Parse(&cli,
+	ctx = kong.Parse(&cli,
 		kong.Name(bin),
 		kong.BindTo(lg, (*alogger.Logger)(nil)),
 		kong.Description("Log Parser"),
@@ -69,4 +74,5 @@ func main() {
 		rcerror = errortree.Add(rcerror, "msg", fmt.Errorf("can not execute '%s' command", ctx.Command()))
 		ctx.FatalIfErrorf(rcerror)
 	}
+
 }
